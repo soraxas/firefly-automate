@@ -1,10 +1,12 @@
 from typing import List, Union, Dict
 
 import yaml
+from schema import Schema, Optional
 
 YamlItemType = Union[Dict[str, object], List[object], str, int, None]
 
-
+"""
+# deprecated
 def merge_user_default_yaml(user: YamlItemType, default: YamlItemType):
     # https://stackoverflow.com/questions/823196/yaml-merge-in-python
     if isinstance(user, dict) and isinstance(default, dict):
@@ -16,18 +18,7 @@ def merge_user_default_yaml(user: YamlItemType, default: YamlItemType):
     return user
 
 
-with open(r"config.yaml") as file:
-    # The FullLoader parameter handles the conversion from YAML
-    # scalar values to Python the dictionary format
-    config = yaml.safe_load(file)
-    # print(config)
-
-with open(r"config_defaults.yaml") as file:
-    # The FullLoader parameter handles the conversion from YAML
-    # scalar values to Python the dictionary format
-    config_defaults = yaml.safe_load(file)
-
-
+# deprecated
 def apply_merge(user_config: YamlItemType, default_config: YamlItemType):
     if type(user_config) is list:
         # apply each item in the list with the defaults
@@ -39,8 +30,34 @@ def apply_merge(user_config: YamlItemType, default_config: YamlItemType):
         raise ValueError(f"type {type(user_config)}: {user_config}")
 
 
+# deprecated
+with open(r"config_defaults.yaml") as file:
+    # The FullLoader parameter handles the conversion from YAML
+    # scalar values to Python the dictionary format
+    config_defaults = yaml.safe_load(file)
+    
+...
+
 for rule_name in config["rules"].keys():
     if rule_name in config_defaults["rules"]:
         apply_merge(config["rules"][rule_name], config_defaults["rules"][rule_name])
+"""
 
-del config_defaults
+main_config_schema = Schema(
+    {
+        "firefly_iii_token": str,
+        "firefly_iii_host": str,
+        # various rules will be validated individually within their classes
+        "rules": Schema({str: object}),
+        # priority should be a str maps to a list of str
+        Optional("priority"): Schema({str: [str]}),
+        # the mapping should be a string map to a string
+        Optional("vendor_name_mappings"): Schema({str: str}),
+    }
+)
+
+with open(r"config.yaml") as file:
+    # The FullLoader parameter handles the conversion from YAML
+    # scalar values to Python the dictionary format
+    config = yaml.safe_load(file)
+    config = main_config_schema.validate(config)

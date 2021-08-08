@@ -4,6 +4,22 @@ from config_loader import config, YamlItemType
 from firefly_datatype import FireflyTransactionDataClass
 from miscs import search_keywords_in_text
 from rules.base_rule import Rule
+from schema import Schema, Optional, Or
+
+auto_classify_schema = Schema(
+    [
+        Schema(
+            {
+                "transaction_type": str,
+                "attribute_to_update": str,
+                Optional("set_extracted_keyword_to_attribute", default=None): Or(
+                    str, None
+                ),
+                "mappings": Schema({str: [str]}),
+            }
+        )
+    ]
+)
 
 
 class RuleSearchKeyword(Rule):
@@ -11,6 +27,7 @@ class RuleSearchKeyword(Rule):
         super().__init__(*args, **kwargs)
         self._name = "auto_classify"
         self._rule_config = config["rules"]["auto_classification_by_keywords"]
+        self._rule_config = auto_classify_schema.validate(self._rule_config)
 
     @property
     def name(self):
