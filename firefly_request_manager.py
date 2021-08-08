@@ -71,5 +71,6 @@ def get_transactions(
             assert len(transaction["attributes"]["transactions"]) == 1
 
             yield FireflyTransactionDataClass(
-                id=transaction["id"], **transaction["attributes"]["transactions"][0],
+                id=transaction["id"],
+                **transaction["attributes"]["transactions"][0],
             )

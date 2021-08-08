@@ -13,7 +13,7 @@ class Rule:
         self.pending_updates = pending_updates
 
     def add_updates(
-            self, entry: FireflyTransactionDataClass, new_attrs: Dict[str, YamlItemType]
+        self, entry: FireflyTransactionDataClass, new_attrs: Dict[str, YamlItemType]
     ):
         """Add a new updates to wrt to the entry"""
         # auto wrap a single tag with a list
@@ -23,7 +23,9 @@ class Rule:
         try:
             if entry.id not in self.pending_updates:
                 _updates = PendingUpdates(
-                    entry, rule_name=self.name, updates_kwargs=new_attrs,
+                    entry,
+                    rule_name=self.name,
+                    updates_kwargs=new_attrs,
                 )
                 if not _updates.is_empty():
                     self.pending_updates[entry.id] = _updates

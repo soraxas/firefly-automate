@@ -16,8 +16,9 @@ from miscs import (
 def main():
     pending_updates: Dict[int, PendingUpdates] = {}
 
-    available_rules = [cls(pending_updates) for cls in
-                       rules.base_rule.Rule.__subclasses__()]
+    available_rules = [
+        cls(pending_updates) for cls in rules.base_rule.Rule.__subclasses__()
+    ]
     print(available_rules)
 
     def process_one_transaction(entry: FireflyTransactionDataClass):
@@ -36,7 +37,7 @@ def main():
     print("========================")
 
     for acc, updates_in_one_acc in group_by(
-            pending_updates.values(), lambda x: x.acc
+        pending_updates.values(), lambda x: x.acc
     ).items():
         print(f"{acc}:")
         grouped_rule_updates = group_by(updates_in_one_acc, lambda x: x.rule)

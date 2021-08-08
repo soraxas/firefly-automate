@@ -55,7 +55,10 @@ class PendingUpdates:
             self.updates["tags"] = list(set(self.entry.tags) | set(_tags))
 
         transaction_update = TransactionUpdate(
-            apply_rules=False, transactions=[TransactionSplitUpdate(**self.updates),],
+            apply_rules=False,
+            transactions=[
+                TransactionSplitUpdate(**self.updates),
+            ],
         )
         return transaction_update
 
@@ -149,7 +152,8 @@ class PendingUpdates:
 
 
 def get_transaction_owner(
-    entry: FireflyTransactionDataClass, actual_name=False,
+    entry: FireflyTransactionDataClass,
+    actual_name=False,
 ):
     global acc_id_to_name
     if acc_id_to_name is None:

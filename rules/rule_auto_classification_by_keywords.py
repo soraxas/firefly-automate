@@ -18,7 +18,8 @@ class RuleSearchKeyword(Rule):
 
     def process(self, entry: FireflyTransactionDataClass):
         for rule in filter(
-            lambda x: x["transaction_type"] == entry.type, self._rule_config,
+            lambda x: x["transaction_type"] == entry.type,
+            self._rule_config,
         ):
 
             for tag_name_or_category, keywords in rule["mappings"].items():

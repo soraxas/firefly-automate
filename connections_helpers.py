@@ -18,8 +18,9 @@ class FireflyPagerWrapper:
     iterate through this list-like structure in a for loop to get all pages.
     """
 
-    def __init__(self, functor: Callable, fetching_name: str = "stuff", *args,
-                 **kwargs):
+    def __init__(
+        self, functor: Callable, fetching_name: str = "stuff", *args, **kwargs
+    ):
         self.functor = functor
         self.args = args
         self.fetching_name = fetching_name
@@ -72,7 +73,7 @@ class FireflyPagerWrapper:
 
 
 def extract_data_from_pager(
-        pager_wrapper: FireflyPagerWrapper,
+    pager_wrapper: FireflyPagerWrapper,
 ) -> Iterator[Dict[str, Any]]:
     """This is a simple wrapper that iterate through each entry in the 'data' entry
     for all pages. This wraps nicely with the FireflyPagerWrapper
