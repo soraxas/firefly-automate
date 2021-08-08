@@ -19,7 +19,6 @@ def main():
     available_rules = [
         cls(pending_updates) for cls in rules.base_rule.Rule.__subclasses__()
     ]
-    print(available_rules)
 
     def process_one_transaction(entry: FireflyTransactionDataClass):
 
