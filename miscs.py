@@ -1,5 +1,16 @@
 import pprint
-from typing import Optional, Dict, List, Callable, TypeVar, Union, Iterable
+import re
+from typing import (
+    Optional,
+    Dict,
+    List,
+    Callable,
+    TypeVar,
+    Union,
+    Iterable,
+    Match,
+    AnyStr,
+)
 
 import humanize
 from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
@@ -174,6 +185,26 @@ def group_by(
             grouped[identity] = []
         grouped[identity].append(item)
     return grouped
+
+
+def search_keywords_in_text(
+    text_to_search: Optional[str], keywords: Union[str, List[str]]
+) -> Union[bool, Match[AnyStr]]:
+    """Return true or false depending on whether the token is found."""
+    if type(keywords) is list:
+        _keyword = "|".join(f"({re.escape(k)})" for k in keywords)
+    elif type(keywords) is str:
+        _keyword = keywords
+    else:
+        raise ValueError(f"{keywords} is of type {type(keywords)}")
+
+    if text_to_search is not None:
+        assert type(text_to_search) is str, type(text_to_search)
+        keyword_search = re.compile(r"\b%s\b" % _keyword, re.I)
+        result = keyword_search.search(text_to_search)
+        if result:
+            return result
+    return False
 
 
 class FireflyIIIRulesConflictException(ValueError):

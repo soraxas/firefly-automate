@@ -19,13 +19,13 @@ def merge_user_default_yaml(user: YamlItemType, default: YamlItemType):
 with open(r"config.yaml") as file:
     # The FullLoader parameter handles the conversion from YAML
     # scalar values to Python the dictionary format
-    config = yaml.load(file, Loader=yaml.FullLoader)
+    config = yaml.safe_load(file)
     # print(config)
 
 with open(r"config_defaults.yaml") as file:
     # The FullLoader parameter handles the conversion from YAML
     # scalar values to Python the dictionary format
-    config_defaults = yaml.load(file, Loader=yaml.FullLoader)
+    config_defaults = yaml.safe_load(file)
 
 
 def apply_merge(user_config: YamlItemType, default_config: YamlItemType):
