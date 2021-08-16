@@ -1,4 +1,6 @@
 #!/bin/env python
+import os
+import pickle
 from typing import Dict, List, Set
 import argparse, argcomplete
 
@@ -69,6 +71,17 @@ parser.add_argument(
     action="store_true",
     help="If set, wait for all transactions' arrival before applying rules",
 )
+parser.add_argument(
+    "--cache-file-name",
+    default="__firefly-iii_automate_cache.pkl",
+    help="File name to be used for cache purpose.",
+    type=str,
+)
+parser.add_argument(
+    "--use-cache",
+    action="store_true",
+    help="If set, store and use previously stored cache file",
+)
 argcomplete.autocomplete(parser)
 
 
@@ -92,9 +105,15 @@ def main():
         except rules.base_rule.StopRuleProcessing:
             pass
 
-    all_transactions = get_transactions(args.start, args.end)
-    if args.wait_for_all_transaction:
-        all_transactions = list(all_transactions)
+    if not args.use_cache or not os.path.exists(args.cache_file_name):
+        all_transactions = list(get_transactions(args.start, args.end))
+
+        if args.use_cache:
+            with open(args.cache_file_name, "wb") as f:
+                pickle.dump(all_transactions, f)
+    else:
+        with open(args.cache_file_name, "rb") as f:
+            all_transactions = pickle.load(f)
 
     for rule in available_rules:
         rule.set_all_transactions(all_transactions)
@@ -119,8 +138,6 @@ def main():
                 print(f" >> rule: {rule_name} <<")
                 for updates in sorted(updates_in_one_rule, key=lambda x: x.date):
                     print(updates)
-
-                    # updates.apply()
 
         print("=========================")
         prompt_response(
