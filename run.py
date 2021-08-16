@@ -1,4 +1,5 @@
 from typing import Dict
+import argparse
 
 import tqdm
 from dateutil.parser import parse as dateutil_parser
@@ -12,18 +13,52 @@ from miscs import (
     group_by,
 )
 
+pending_updates: Dict[int, PendingUpdates] = {}
+available_rules = [
+    cls(pending_updates) for cls in rules.base_rule.Rule.__subclasses__()
+]
+available_rules_name = list(map(lambda r: r.base_name, available_rules))
+
+parser = argparse.ArgumentParser()
+# plotting generic flags
+parser.add_argument(
+    "--run",
+    choices=available_rules_name,
+    help="Only run the specified rule",
+    type=str,
+)
+parser.add_argument(
+    "-d",
+    "--disable",
+    default=[],
+    nargs="+",
+    choices=available_rules_name,
+    help="Disable the following rules",
+    type=str,
+)
+parser.add_argument(
+    "--list-rules",
+    action="store_true",
+    help="List all available rules' base-name and then exit",
+)
+
 
 def main():
-    pending_updates: Dict[int, PendingUpdates] = {}
+    global available_rules, available_rules_name
+    args = parser.parse_args()
 
-    available_rules = [
-        cls(pending_updates) for cls in rules.base_rule.Rule.__subclasses__()
-    ]
+    if args.list_rules:
+        print("\n".join(available_rules_name))
+        return
+    if args.run:
+        available_rules = filter(lambda x: x.base_name == args.run, available_rules)
 
     def process_one_transaction(entry: FireflyTransactionDataClass):
 
         try:
             for rule in available_rules:
+                if rule.base_name in args.disable:
+                    continue
                 rule.process(entry)
         except rules.base_rule.StopRuleProcessing:
             pass

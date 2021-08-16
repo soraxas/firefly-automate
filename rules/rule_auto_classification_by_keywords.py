@@ -24,14 +24,9 @@ auto_classify_schema = Schema(
 
 class RuleSearchKeyword(Rule):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._name = "auto_classify"
-        self._rule_config = config["rules"]["auto_classification_by_keywords"]
+        super().__init__("classify_transaction", *args, **kwargs)
+        self._rule_config = config["rules"]["classify_transaction"]
         self._rule_config = auto_classify_schema.validate(self._rule_config)
-
-    @property
-    def name(self):
-        return self._name
 
     def process(self, entry: FireflyTransactionDataClass):
         for rule in filter(
@@ -54,8 +49,5 @@ class RuleSearchKeyword(Rule):
                             rule["set_extracted_keyword_to_attribute"]
                         ] = keywords[index]
 
-                    self._name = (
-                        f"auto_classify__{rule['transaction_type']}_"
-                        f"{rule['attribute_to_update']}"
-                    )
+                    self.set_name_suffix(rule["attribute_to_update"])
                     self.add_updates(entry, new_attribute)

@@ -39,13 +39,9 @@ search_keyword_schema = Schema(
 
 class RuleSearchKeyword(Rule):
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        super().__init__("search_keyword", *args, **kwargs)
         self._rule_config = config["rules"]["search_keyword"]
         self._rule_config = search_keyword_schema.validate(self._rule_config)
-
-    @property
-    def name(self):
-        return "search_keyword"
 
     def process(self, entry: FireflyTransactionDataClass) -> Dict[str, YamlItemType]:
         self._process(entry, "ignore")
@@ -59,6 +55,7 @@ class RuleSearchKeyword(Rule):
             self._rule_config,
         ):
             if search_keywords_in_text(entry[rule["target"]], rule["keyword"]):
+                self.set_name_suffix(rule["name"])
                 if "conditional" in rule:
                     # check condition
                     for conditional_rule in rule["conditional"]:

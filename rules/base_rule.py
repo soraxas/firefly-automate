@@ -9,8 +9,29 @@ from miscs import PendingUpdates, FireflyIIIRulesConflictException
 
 
 class Rule:
-    def __init__(self, pending_updates: Dict[int, PendingUpdates]):
+    def __init__(self, base_name: str, pending_updates: Dict[int, PendingUpdates]):
         self.pending_updates = pending_updates
+        self._name_base = base_name
+        self.name_suffix = None
+
+    @property
+    def base_name(self) -> str:
+        self._name_base = self._sanitise_name(self._name_base)
+        return self._name_base
+
+    @property
+    def name(self) -> str:
+        if self.name_suffix is None:
+            return self.base_name
+        self.name_suffix = self._sanitise_name(self.name_suffix)
+        return f"{self.base_name}__{self.name_suffix}"
+
+    @staticmethod
+    def _sanitise_name(name: str) -> str:
+        return name.replace(" ", "-").replace("_", "-")
+
+    def set_name_suffix(self, name_suffix):
+        self.name_suffix = name_suffix
 
     def add_updates(
         self, entry: FireflyTransactionDataClass, new_attrs: Dict[str, YamlItemType]
@@ -38,10 +59,6 @@ class Rule:
 
     @abstractmethod
     def process(self, entry: FireflyTransactionDataClass) -> Dict[str, YamlItemType]:
-        raise NotImplementedError()
-
-    @property
-    def name(self):
         raise NotImplementedError()
 
 
