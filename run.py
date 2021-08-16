@@ -53,7 +53,9 @@ def main():
         print("\n".join(available_rules_name))
         return
     if args.run:
-        available_rules = filter(lambda x: x.base_name == args.run, available_rules)
+        available_rules = list(
+            filter(lambda x: x.base_name == args.run, available_rules)
+        )
 
     def process_one_transaction(entry: FireflyTransactionDataClass):
 

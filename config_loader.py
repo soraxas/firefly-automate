@@ -35,7 +35,7 @@ with open(r"config_defaults.yaml") as file:
     # The FullLoader parameter handles the conversion from YAML
     # scalar values to Python the dictionary format
     config_defaults = yaml.safe_load(file)
-    
+
 ...
 
 for rule_name in config["rules"].keys():
@@ -50,7 +50,8 @@ main_config_schema = Schema(
         # various rules will be validated individually within their classes
         "rules": Schema({str: object}),
         # priority should be a str maps to a list of str
-        Optional("priority"): Schema({str: [str]}),
+        Optional("mapping_priority"): Schema({str: [str]}),
+        Optional("rule_priority"): Schema({str: [str]}),
         # the mapping should be a string map to a string
         Optional("vendor_name_mappings"): Schema({str: str}),
     }

@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import pprint
 import re
 from typing import (
@@ -30,6 +31,17 @@ TransactionUpdateValueType = Union[str, List[str]]
 PendingUpdateValuesDict = Dict[str, TransactionUpdateValueType]
 
 
+@dataclass
+class PendingUpdateItem:
+    rule: str
+    new_val: str
+
+    def __eq__(self, other):
+        if type(self) is type(other):
+            return self.new_val == other.new_val
+        raise NotImplementedError()
+
+
 class PendingUpdates:
     def __init__(
         self,
@@ -40,29 +52,38 @@ class PendingUpdates:
         merge_tags: bool = True,
     ):
         self.entry = entry
-        self.updates = self.sanitise_updates(updates_kwargs)
-        self.rule = rule_name
+        self.updates: Dict[str, PendingUpdateItem] = self.sanitise_updates(
+            rule_name, updates_kwargs
+        )
+        self._rules = [rule_name]
 
         self.apply_rule = apply_rule
         self.merge_tags = merge_tags
+
+    @property
+    def rule(self) -> str:
+        return " & ".join(self._rules)
 
     def is_empty(self) -> bool:
         return len(self.updates) == 0
 
     def get_transaction_update(self) -> TransactionUpdate:
-        if "tags" in self.updates and self.merge_tags:
-            _tags = self.updates["tags"]
-            self.updates["tags"] = list(set(self.entry.tags) | set(_tags))
+        _updates = {k: v.new_val for k, v in self.updates.items()}
+        if "tags" in _updates and self.merge_tags:
+            _tags = _updates["tags"]
+            _updates["tags"] = list(set(self.entry.tags) | set(_tags))
 
         transaction_update = TransactionUpdate(
             apply_rules=False,
             transactions=[
-                TransactionSplitUpdate(**self.updates),
+                TransactionSplitUpdate(**_updates),
             ],
         )
         return transaction_update
 
     def append_updates(self, rule: str, updates: PendingUpdateValuesDict):
+        updates = self.sanitise_updates(rule, updates)
+
         updates_that_allows_duplicates = {"tags"}
         union_set = (
             set(self.updates.keys())
@@ -70,14 +91,39 @@ class PendingUpdates:
         )
         # remove key from union set if the keys are the same in both updates
         for key in list(union_set):  # list to prevent size change during iteration
+            if key in config["rule_priority"]:
+                # only apply this resolution if both rules are within the priority list
+                if all(
+                    r in config["rule_priority"][key]
+                    for r in (rule, self.updates[key].rule)
+                ):
+                    union_set -= {key}
+                    if config["rule_priority"][key].index(rule) > config[
+                        "rule_priority"
+                    ][key].index(self.updates[key].rule):
+                        # use existing value
+                        updates.pop(key)
+                    else:
+                        # use new value
+                        self.updates.pop(key)
+
+        # resolve conflict if there are preset rule priority in the config file
+        for key in list(union_set):
             if self.updates[key] == updates[key]:
                 union_set -= {key}
         if len(union_set) > 0:
             raise FireflyIIIRulesConflictException(
-                self.rule, rule, self.updates, updates
+                self.updates[key].rule,
+                rule,
+                self.updates,
+                updates
+                # ' & '.join(self._rules), rule, self.updates, updates
             )
-        self.rule += f" & {rule}"
-        self.updates.update(self.sanitise_updates(updates))
+        self._rules.append(rule)
+        for k, v in updates.items():
+            # self.updates[k] = PendingUpdateItem(rule, v)
+            self.updates[k] = v
+        # self.updates.update(updates)
 
     def apply(self, dry_run=True, debug=False):
         transaction_update = self.get_transaction_update()
@@ -96,11 +142,11 @@ class PendingUpdates:
         # ret += f"    rule: {self.rule}\n"
         ret += f"    date: " f"{humanize.naturaldate(self.date)}\n"
         ret += f"    desc: {self.entry.description}\n"
-        for key, val in self.updates.items():
-            ret += f"        > {key}:\t{self.entry[key]}\t=>\t{val}\n"
+        for k, v in self.updates.items():
+            ret += f"        > {k}:\t{self.entry[k]}\t=>\t{v.new_val}\n"
         return ret
 
-    def sanitise_updates(self, dictionary: PendingUpdateValuesDict):
+    def sanitise_updates(self, rule_name: str, dictionary: PendingUpdateValuesDict):
         """Skip any items that are the same as the current value"""
         # apply nice name mappings
         for key in ["source_name", "destination_name"]:
@@ -120,22 +166,25 @@ class PendingUpdates:
             else:
                 if self.entry[k] == v:
                     continue
-            ret[k] = v
+            ret[k] = PendingUpdateItem(rule_name, v)
         # apply priority settings
         for key, new_val in list(dictionary.items()):
             if self.entry[key] is None:
                 continue
             existing_val = self.entry[key]
             # see if we need to apply our priority settings
-            if key in config["priority"] and existing_val in config["priority"][key]:
+            if (
+                key in config["mapping_priority"]
+                and existing_val in config["mapping_priority"][key]
+            ):
                 # the current value is part of the priority setting.
                 # if the new value is not part of the priority setting, then we will use
                 # the existing one (as it will default with the lowest priority)
                 # if it is, we will replace the current one only if the new one has a
                 # higher priority.
-                if new_val in config["priority"][key]:
-                    new_rank = config["priority"][key].index(new_val)
-                    existing_rank = config["priority"][key].index(existing_val)
+                if new_val in config["mapping_priority"][key]:
+                    new_rank = config["mapping_priority"][key].index(new_val)
+                    existing_rank = config["mapping_priority"][key].index(existing_val)
                     if existing_rank < new_rank:
                         # remove the new update as it has lower priority
                         ret.pop(key)
@@ -224,8 +273,8 @@ class FireflyIIIRulesConflictException(ValueError):
             f" - {self.rule1}\n"
             f" - {self.rule2}\n"
             f"With the updates:\n"
-            f"{pprint.pformat(self.updates1, indent=2, width=40)}\n"
-            f"{pprint.pformat(self.updates2, indent=2, width=40)}\n"
+            f"{pprint.pformat({k: v.new_val for k, v in self.updates1.items()}, indent=2, width=40)}\n"
+            f"{pprint.pformat({k: v.new_val for k, v in self.updates2.items()}, indent=2, width=40)}\n"
         )
 
         super().__init__(self.message)
