@@ -48,7 +48,7 @@ class PendingUpdates:
         entry: FireflyTransactionDataClass,
         rule_name: str,
         updates_kwargs: PendingUpdateValuesDict,
-        apply_rule: bool = False,
+        apply_rule: bool = True,
         merge_tags: bool = True,
     ):
         self.entry = entry
@@ -74,7 +74,7 @@ class PendingUpdates:
             _updates["tags"] = list(set(self.entry.tags) | set(_tags))
 
         transaction_update = TransactionUpdate(
-            apply_rules=False,
+            apply_rules=self.apply_rule,
             transactions=[
                 TransactionSplitUpdate(**_updates),
             ],
