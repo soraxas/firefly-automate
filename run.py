@@ -3,7 +3,9 @@ from typing import Dict, List, Set
 import argparse, argcomplete
 
 import tqdm
+from datetime import datetime
 from dateutil.parser import parse as dateutil_parser
+from dateutil.relativedelta import relativedelta
 
 import rules
 import rules.base_rule
@@ -51,14 +53,16 @@ parser.add_argument(
 parser.add_argument(
     "-s",
     "--start",
-    default="1 Jan 2000",
-    help="Start date for the range of transactions to process",
+    default=(datetime.now() - relativedelta(month=3)).date(),
+    help="Start date for the range of transactions to process (default 3 months ago)",
+    type=lambda x: dateutil_parser(x).date(),
 )
 parser.add_argument(
     "-e",
     "--end",
-    default="1 Jan 2200",
+    default=datetime.now().date(),
     help="End date for the range of transactions to process",
+    type=lambda x: dateutil_parser(x).date(),
 )
 parser.add_argument(
     "--wait-for-all-transaction",
@@ -88,9 +92,7 @@ def main():
         except rules.base_rule.StopRuleProcessing:
             pass
 
-    start = dateutil_parser(args.start).date()
-    end = dateutil_parser(args.end).date()
-    all_transactions = get_transactions(start, end)
+    all_transactions = get_transactions(args.start, args.end)
     if args.wait_for_all_transaction:
         all_transactions = list(all_transactions)
 
