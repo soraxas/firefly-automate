@@ -48,6 +48,13 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
         return api_response
 
 
+def send_transaction_delete(transaction_id: int):
+    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
+        api_instance = transactions_api.TransactionsApi(api_client)
+        api_response = api_instance.delete_transaction(transaction_id)
+        return api_response
+
+
 def get_transactions(
     start: datetime.date, end: datetime.date
 ) -> Iterable[FireflyTransactionDataClass]:

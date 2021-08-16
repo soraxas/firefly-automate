@@ -1,7 +1,7 @@
 import dataclasses
 import pprint
 from abc import abstractmethod
-from typing import Dict
+from typing import Dict, Set
 
 from config_loader import YamlItemType
 from firefly_datatype import FireflyTransactionDataClass
@@ -9,10 +9,20 @@ from miscs import PendingUpdates, FireflyIIIRulesConflictException
 
 
 class Rule:
-    def __init__(self, base_name: str, pending_updates: Dict[int, PendingUpdates]):
+    def __init__(
+        self,
+        base_name: str,
+        pending_updates: Dict[int, PendingUpdates],
+        pending_deletes: Set[int],
+    ):
         self.pending_updates = pending_updates
+        self.pending_deletes = pending_deletes
         self._name_base = base_name
         self.name_suffix = None
+
+    @property
+    def enable_by_default(self) -> bool:
+        return True
 
     @property
     def base_name(self) -> str:
@@ -25,6 +35,9 @@ class Rule:
             return self.base_name
         self.name_suffix = self._sanitise_name(self.name_suffix)
         return f"{self.base_name}__{self.name_suffix}"
+
+    def set_all_transactions(self, transactions):
+        self.transactions = transactions
 
     @staticmethod
     def _sanitise_name(name: str) -> str:

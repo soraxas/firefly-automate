@@ -220,7 +220,8 @@ def get_transaction_owner(
     if actual_name:
         if type(belongs_to) is tuple:
             return acc_id_to_name[belongs_to[0]], acc_id_to_name[belongs_to[1]]
-    return acc_id_to_name[belongs_to]
+        return acc_id_to_name[belongs_to]
+    return belongs_to
 
 
 T = TypeVar("T")
@@ -258,6 +259,19 @@ def search_keywords_in_text(
         if result:
             return result
     return False
+
+
+def prompt_response(msg: str):
+    abort = True
+    try:
+        user_input = input(f"{msg} [yN] ")
+        abort = user_input.strip().lower() != "y"
+    except KeyboardInterrupt:
+        print()
+        pass
+    if abort:
+        print("Aborting...")
+        exit(1)
 
 
 class FireflyIIIRulesConflictException(ValueError):
