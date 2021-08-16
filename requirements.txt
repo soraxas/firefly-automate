@@ -6,3 +6,4 @@ schema==0.7.4
 tqdm~=4.62.0
 python-dateutil~=2.8.2
 humanize~=3.11.0
+argcomplete==1.12.3

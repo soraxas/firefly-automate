@@ -1,5 +1,6 @@
+#!/bin/env python
 from typing import Dict
-import argparse
+import argparse, argcomplete
 
 import tqdm
 from dateutil.parser import parse as dateutil_parser
@@ -45,6 +46,7 @@ parser.add_argument(
 
 def main():
     global available_rules, available_rules_name
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     if args.list_rules:
