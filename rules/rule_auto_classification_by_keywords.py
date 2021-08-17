@@ -33,12 +33,13 @@ class RuleSearchKeyword(Rule):
             lambda x: x["transaction_type"] == entry.type,
             self._rule_config,
         ):
-
+            self.set_name_suffix(rule["attribute_to_update"])
             for tag_name_or_category, keywords in rule["mappings"].items():
                 result = search_keywords_in_text(entry.description, keywords)
                 if result:
                     new_attribute = {rule["attribute_to_update"]: tag_name_or_category}
                     if rule["set_extracted_keyword_to_attribute"]:
+                        """
                         # because regex ignore case will destroy the capitalisation.
                         # we will manually retrieve the word that was a successful match
                         # directly from the config
@@ -48,6 +49,16 @@ class RuleSearchKeyword(Rule):
                         new_attribute[
                             rule["set_extracted_keyword_to_attribute"]
                         ] = keywords[index]
-
-                    self.set_name_suffix(rule["attribute_to_update"])
-                    self.add_updates(entry, new_attribute)
+                        """
+                        # because regex always priorties keyword that are earlier in the sentence,
+                        # which will causes us to miss several keywords that appear later in the
+                        # sentence. Instead, we will loop through all keywords and manually search all
+                        desc = entry.description.upper()
+                        for k in keywords:
+                            if k.upper() in desc:
+                                new_attribute[
+                                    rule["set_extracted_keyword_to_attribute"]
+                                ] = k
+                                self.add_updates(entry, new_attribute)
+                    else:
+                        self.add_updates(entry, new_attribute)

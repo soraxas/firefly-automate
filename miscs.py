@@ -172,6 +172,8 @@ class PendingUpdates:
             if self.entry[key] is None:
                 continue
             existing_val = self.entry[key]
+            if new_val == existing_val:
+                continue
             # see if we need to apply our priority settings
             if (
                 key in config["mapping_priority"]
