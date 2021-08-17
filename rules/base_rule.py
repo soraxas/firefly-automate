@@ -39,6 +39,9 @@ class Rule:
     def set_all_transactions(self, transactions):
         self.transactions = transactions
 
+    def set_rule_config(self, rule_config):
+        self.rule_config = rule_config
+
     @staticmethod
     def _sanitise_name(name: str) -> str:
         return name.replace(" ", "-").replace("_", "-")

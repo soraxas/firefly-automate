@@ -82,6 +82,12 @@ parser.add_argument(
     action="store_true",
     help="If set, store and use previously stored cache file",
 )
+parser.add_argument(
+    "--rule-config",
+    default="",
+    help="String that pass to rule backend",
+    type=str,
+)
 argcomplete.autocomplete(parser)
 
 
@@ -117,6 +123,7 @@ def main():
 
     for rule in available_rules:
         rule.set_all_transactions(all_transactions)
+        rule.set_rule_config(args.rule_config)
     # TODO: make this parallel if num of transactions is huge
     for data in all_transactions:
         process_one_transaction(data)
