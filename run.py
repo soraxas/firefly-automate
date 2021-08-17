@@ -108,9 +108,9 @@ def main():
     if not args.use_cache or not os.path.exists(args.cache_file_name):
         all_transactions = list(get_transactions(args.start, args.end))
 
-        if args.use_cache:
-            with open(args.cache_file_name, "wb") as f:
-                pickle.dump(all_transactions, f)
+        # if args.use_cache:
+        with open(args.cache_file_name, "wb") as f:
+            pickle.dump(all_transactions, f)
     else:
         with open(args.cache_file_name, "rb") as f:
             all_transactions = pickle.load(f)
