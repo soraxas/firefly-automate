@@ -1,5 +1,6 @@
 from typing import List, Union, Dict
 
+import os
 import yaml
 from schema import Schema, Optional
 
@@ -61,4 +62,9 @@ with open(r"config.yaml") as file:
     # The FullLoader parameter handles the conversion from YAML
     # scalar values to Python the dictionary format
     config = yaml.safe_load(file)
+    # optional config setting from env var for secret keys
+    for key in ['firefly_iii_host', 'firefly_iii_token']:
+        val = os.getenv(key)
+        if val is not None:
+            config[key] = val
     config = main_config_schema.validate(config)
