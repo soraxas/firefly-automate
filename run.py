@@ -31,7 +31,11 @@ available_rules = list(filter(lambda x: x.enable_by_default, all_rules))
 available_rules_name = list(map(lambda r: r.base_name, available_rules))
 
 parser = argparse.ArgumentParser()
-# plotting generic flags
+parser.add_argument(
+    "--yes",
+    action="store_true",
+    help="Assume yes to all confirmations",
+)
 parser.add_argument(
     "--run",
     choices=all_rules_name,
@@ -147,15 +151,17 @@ def main():
                     print(updates)
 
         print("=========================")
-        prompt_response(
-            ">> IMPORTANT: Review the above output and see if the updates are ok:"
-        )
+        if not args.yes:
+            prompt_response(
+                ">> IMPORTANT: Review the above output and see if the updates are ok:"
+            )
 
         for updates in tqdm.tqdm(pending_updates.values(), desc="Applying updates"):
             updates.apply(dry_run=False)
 
     elif len(pending_deletes) > 0:
-        prompt_response(">> Ready to perform the delete?")
+        if not args.yes:
+            prompt_response(">> Ready to perform the delete?")
         for deletes_id in tqdm.tqdm(pending_deletes, desc="Applying deletes"):
             send_transaction_delete(int(deletes_id))
 
