@@ -3,9 +3,9 @@ import pprint
 from abc import abstractmethod
 from typing import Dict, Set
 
-from config_loader import YamlItemType
-from firefly_datatype import FireflyTransactionDataClass
-from miscs import PendingUpdates, FireflyIIIRulesConflictException
+from firefly_automate.config_loader import YamlItemType
+from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.miscs import PendingUpdates, FireflyIIIRulesConflictException
 
 
 class Rule:

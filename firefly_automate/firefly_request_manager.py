@@ -7,9 +7,12 @@ from firefly_iii_client.api import transactions_api
 from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilter
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
-from config_loader import config, YamlItemType
-from connections_helpers import extract_data_from_pager, FireflyPagerWrapper
-from firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.config_loader import config, YamlItemType
+from firefly_automate.connections_helpers import (
+    extract_data_from_pager,
+    FireflyPagerWrapper,
+)
+from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 
 
 def get_firefly_client_conf() -> YamlItemType:

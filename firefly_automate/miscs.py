@@ -17,9 +17,9 @@ import humanize
 from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
-from config_loader import config
-from firefly_datatype import FireflyTransactionDataClass
-from firefly_request_manager import (
+from firefly_automate.config_loader import config
+from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.firefly_request_manager import (
     send_transaction_update,
     get_firefly_account_mappings,
 )

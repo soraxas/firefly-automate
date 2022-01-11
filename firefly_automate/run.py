@@ -9,10 +9,13 @@ from datetime import datetime
 from dateutil.parser import parse as dateutil_parser
 from dateutil.relativedelta import relativedelta
 
-import rules
-import rules.base_rule
-from firefly_request_manager import get_transactions, send_transaction_delete
-from miscs import (
+from firefly_automate import rules
+import firefly_automate.rules.base_rule
+from firefly_automate.firefly_request_manager import (
+    get_transactions,
+    send_transaction_delete,
+)
+from firefly_automate.miscs import (
     FireflyTransactionDataClass,
     PendingUpdates,
     group_by,

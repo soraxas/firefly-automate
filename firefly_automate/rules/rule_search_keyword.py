@@ -2,10 +2,10 @@ from typing import Union, Dict
 
 from schema import Schema, Optional, Or
 
-from config_loader import config, YamlItemType
-from firefly_datatype import FireflyTransactionDataClass
-from miscs import search_keywords_in_text
-from rules.base_rule import Rule, StopRuleProcessing
+from firefly_automate.config_loader import config, YamlItemType
+from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.miscs import search_keywords_in_text
+from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
 
 
 replace_schema = Schema({str: Or(str, [str])})

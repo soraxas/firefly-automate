@@ -4,10 +4,10 @@ import dataclasses
 
 from schema import Schema, Optional, Or
 
-from config_loader import config, YamlItemType
-from firefly_datatype import FireflyTransactionDataClass
-from miscs import search_keywords_in_text, get_transaction_owner
-from rules.base_rule import Rule, StopRuleProcessing
+from firefly_automate.config_loader import config, YamlItemType
+from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.miscs import search_keywords_in_text, get_transaction_owner
+from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
 
 
 remove_duplicates_schema = Schema(
@@ -73,7 +73,10 @@ class RemoveDuplicates(Rule):
         if len(potential_duplicates) > 1:
 
             all_ids = set(potential_duplicates.id.astype(int))
-            if any(len(all_ids.difference(ids)) == 0 for ids in self.ids_that_allow_duplicates):
+            if any(
+                len(all_ids.difference(ids)) == 0
+                for ids in self.ids_that_allow_duplicates
+            ):
                 # these are in exceptions as specified by configs
                 return
 
