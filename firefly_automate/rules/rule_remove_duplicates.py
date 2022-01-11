@@ -4,7 +4,7 @@ import dataclasses
 
 from schema import Schema, Optional, Or
 
-from firefly_automate.config_loader import config, YamlItemType
+from firefly_automate.config_loader import YamlItemType
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text, get_transaction_owner
 from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
@@ -20,11 +20,11 @@ remove_duplicates_schema = Schema(
 
 
 class RemoveDuplicates(Rule):
+    schema = remove_duplicates_schema
+
     def __init__(self, *args, **kwargs):
         super().__init__("remove_duplicates", *args, **kwargs)
-        self._rule_config = config["rules"]["remove_duplicates"]
-        self._rule_config = remove_duplicates_schema.validate(self._rule_config)
-        self.ids_that_allow_duplicates = list(map(set, self._rule_config))
+        self.ids_that_allow_duplicates = list(map(set, self.config))
         self.df_transactions = None
         self.delete_master_id = set()
         self.ignored_entries = []

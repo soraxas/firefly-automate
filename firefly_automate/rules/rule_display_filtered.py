@@ -15,8 +15,6 @@ from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
 class DisplayFiltered(Rule):
     def __init__(self, *args, **kwargs):
         super().__init__("display_filtered", *args, **kwargs)
-        # self._rule_config = config["rules"]["search_keyword"]
-        # self._rule_config = search_keyword_schema.validate(self._rule_config)
         self.df_transactions = None
         self.delete_master_id = set()
 

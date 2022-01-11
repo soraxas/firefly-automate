@@ -1,1 +1,11 @@
-run.py
+#!/bin/env python
+
+import sys
+import pathlib
+
+thisfile = pathlib.Path(__file__)
+sys.path.insert(0, thisfile.parent / "firefly_automate")
+
+import firefly_automate.run
+
+firefly_automate.run.main()

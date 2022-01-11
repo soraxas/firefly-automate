@@ -1,6 +1,6 @@
 from typing import Dict
 
-from firefly_automate.config_loader import config, YamlItemType
+from firefly_automate.config_loader import YamlItemType
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text
 from firefly_automate.rules.base_rule import Rule
@@ -23,15 +23,15 @@ auto_classify_schema = Schema(
 
 
 class RuleSearchKeyword(Rule):
+    schema = auto_classify_schema
+
     def __init__(self, *args, **kwargs):
         super().__init__("classify_transaction", *args, **kwargs)
-        self._rule_config = config["rules"]["classify_transaction"]
-        self._rule_config = auto_classify_schema.validate(self._rule_config)
 
     def process(self, entry: FireflyTransactionDataClass):
         for rule in filter(
             lambda x: x["transaction_type"] == entry.type,
-            self._rule_config,
+            self.config,
         ):
             self.set_name_suffix(rule["attribute_to_update"])
             for tag_name_or_category, keywords in rule["mappings"].items():

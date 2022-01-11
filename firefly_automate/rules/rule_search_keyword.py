@@ -2,7 +2,7 @@ from typing import Union, Dict
 
 from schema import Schema, Optional, Or
 
-from firefly_automate.config_loader import config, YamlItemType
+from firefly_automate.config_loader import YamlItemType
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text
 from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
@@ -38,10 +38,10 @@ search_keyword_schema = Schema(
 
 
 class RuleSearchKeyword(Rule):
+    schema = search_keyword_schema
+
     def __init__(self, *args, **kwargs):
         super().__init__("search_keyword", *args, **kwargs)
-        self._rule_config = config["rules"]["search_keyword"]
-        self._rule_config = search_keyword_schema.validate(self._rule_config)
 
     def process(self, entry: FireflyTransactionDataClass) -> Dict[str, YamlItemType]:
         self._process(entry, "ignore")
@@ -52,7 +52,7 @@ class RuleSearchKeyword(Rule):
     ):
         for rule in filter(
             lambda x: x["num_of_token"] == num_of_token,
-            self._rule_config,
+            self.config,
         ):
             if search_keywords_in_text(entry[rule["target"]], rule["keyword"]):
                 self.set_name_suffix(rule["name"])

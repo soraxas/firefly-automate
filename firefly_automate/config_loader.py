@@ -49,7 +49,7 @@ main_config_schema = Schema(
         "firefly_iii_token": str,
         "firefly_iii_host": str,
         # various rules will be validated individually within their classes
-        "rules": Schema({str: object}),
+        Optional("rules"): Schema(None, {str: object}),
         # priority should be a str maps to a list of str
         Optional("mapping_priority"): Schema({str: [str]}),
         Optional("rule_priority"): Schema({str: [str]}),
@@ -58,10 +58,10 @@ main_config_schema = Schema(
     }
 )
 
-with open(r"config.yaml") as file:
+with open(os.path.expanduser("~/.config/firefly-automate/config.yaml")) as file:
     # The FullLoader parameter handles the conversion from YAML
     # scalar values to Python the dictionary format
-    config = yaml.safe_load(file)
+    config = yaml.safe_load(file) or dict()
     # optional config setting from env var for secret keys
     for key in ["firefly_iii_host", "firefly_iii_token"]:
         val = os.getenv(key)

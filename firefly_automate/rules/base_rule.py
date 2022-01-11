@@ -3,7 +3,7 @@ import pprint
 from abc import abstractmethod
 from typing import Dict, Set
 
-from firefly_automate.config_loader import YamlItemType
+from firefly_automate.config_loader import config, YamlItemType
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.miscs import PendingUpdates, FireflyIIIRulesConflictException
 
@@ -19,6 +19,12 @@ class Rule:
         self.pending_deletes = pending_deletes
         self._name_base = base_name
         self.name_suffix = None
+        try:
+            conf = config["rules"][base_name]
+            conf = self.__class__.schema.validate(conf)
+        except KeyError:
+            conf = dict()
+        self.config = conf
 
     @property
     def enable_by_default(self) -> bool:
