@@ -73,6 +73,12 @@ class PendingUpdates:
             _tags = _updates["tags"]
             _updates["tags"] = list(set(self.entry.tags) | set(_tags))
 
+        # add transaction_journal_id to indicate the update on the potentially split
+        # see https://github.com/firefly-iii/firefly-iii/issues/5610
+        # see https://github.com/firefly-iii/firefly-iii/blob/4c27bbf06971b45f17cb939ae97e475cb416bf32/app/Validation/GroupValidation.php#L41
+        assert "transaction_journal_id" not in _updates
+        _updates["transaction_journal_id"] = self.entry.transaction_journal_id
+
         transaction_update = TransactionUpdate(
             apply_rules=self.apply_rule,
             transactions=[
@@ -143,7 +149,11 @@ class PendingUpdates:
         ret += f"    date: " f"{humanize.naturaldate(self.date)}\n"
         ret += f"    desc: {self.entry.description}\n"
         for k, v in self.updates.items():
-            ret += f"        > {k}:\t{self.entry[k]}\t=>\t{v.new_val}\n"
+            if k == "tags":
+                _type = "merge" if self.merge_tags else "replace"
+                ret += f"        > {k}:\t{self.entry[k]}\t=>\t{_type}{v.new_val}\n"
+            else:
+                ret += f"        > {k}:\t{self.entry[k]}\t=>\t{v.new_val}\n"
         return ret
 
     def sanitise_updates(self, rule_name: str, dictionary: PendingUpdateValuesDict):

@@ -1,7 +1,9 @@
 import datetime
+import logging
 from typing import Dict, Iterable
 
 import firefly_iii_client
+from firefly_iii_client import Configuration
 from firefly_iii_client.api import accounts_api
 from firefly_iii_client.api import transactions_api
 from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilter
@@ -14,8 +16,14 @@ from firefly_automate.connections_helpers import (
 )
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 
+LOGGER = logging.getLogger(__name__)
 
-def get_firefly_client_conf() -> YamlItemType:
+
+class TransactionUpdateError(Exception):
+    pass
+
+
+def get_firefly_client_conf() -> Configuration:
     # The client must configure the authentication and authorization parameters
     # in accordance with the API server security policy.
     # Examples for each auth method are provided below, use the example that
@@ -45,16 +53,21 @@ def get_firefly_account_mappings() -> Dict[str, str]:
 def send_transaction_update(transaction_id: int, transaction_update: TransactionUpdate):
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = transactions_api.TransactionsApi(api_client)
-        api_response = api_instance.update_transaction(
-            transaction_id, transaction_update
-        )
+        try:
+            api_response = api_instance.update_transaction(
+                str(transaction_id), transaction_update
+            )
+        except firefly_iii_client.ApiException as e:
+            raise TransactionUpdateError(
+                f"Attempting to update transaction {transaction_id}: {transaction_update}"
+            ) from e
         return api_response
 
 
 def send_transaction_delete(transaction_id: int):
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = transactions_api.TransactionsApi(api_client)
-        api_response = api_instance.delete_transaction(transaction_id)
+        api_response = api_instance.delete_transaction(str(transaction_id))
         return api_response
 
 

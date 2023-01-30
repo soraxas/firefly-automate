@@ -1,6 +1,8 @@
 from collections import Callable
 from typing import Any, Dict, Iterator
 
+from icecream import ic
+
 import tqdm
 
 
@@ -13,7 +15,7 @@ class FireflyPagerWrapper:
     request the rest of the pages one by one.
 
     This wrapper will first make a synchronised request to page one, then request the
-    rest of the pages asynchronously. These functionality are wrapped as a generator
+    rest of the pages asynchronously. This functionality are wrapped as a generator
     so end-user do not need to worry about the arrival of the data, they can simply
     iterate through this list-like structure in a for loop to get all pages.
     """
@@ -29,9 +31,13 @@ class FireflyPagerWrapper:
     def __iter__(self):
         self.pbar = tqdm.tqdm(desc=f"fetching {self.fetching_name}")
 
+        kwargs = dict(self.kwargs)
+        # FIXME ignore return type checking for now (as the schema currently has mistakes)
+        kwargs["_check_return_type"] = False
+
         # First we will request the first page.
         # Then, all subsequent pages will be obtained using async
-        api_response = self.functor(page=1, *self.args, **self.kwargs)
+        api_response = self.functor(page=1, *self.args, **kwargs)
 
         # see how many pages we need to go through
         total_pages = api_response["meta"]["pagination"]["total_pages"]
@@ -41,7 +47,7 @@ class FireflyPagerWrapper:
         self.async_responses = []
         for page_num in range(2, total_pages + 1):
             self.async_responses.append(
-                self.functor(page=page_num, *self.args, **self.kwargs, async_req=True)
+                self.functor(page=page_num, *self.args, **kwargs, async_req=True)
             )
 
         # ##########
@@ -80,4 +86,5 @@ def extract_data_from_pager(
     """
     for page in pager_wrapper:
         for d in page["data"]:
-            yield d.to_dict()
+            yield ic(d)
+            # yield d.to_dict()

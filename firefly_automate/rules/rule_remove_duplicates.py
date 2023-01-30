@@ -46,7 +46,7 @@ class RemoveDuplicates(Rule):
     def enable_by_default(self) -> bool:
         return False
 
-    def process(self, entry: FireflyTransactionDataClass) -> Dict[str, YamlItemType]:
+    def process(self, entry: FireflyTransactionDataClass):
         if entry.id in self.delete_master_id or entry.id in self.pending_deletes:
             # do not remove both the master and slave transactions
             return

@@ -1,5 +1,6 @@
 #!/bin/env python
 import os
+import logging
 import pickle
 from typing import Dict, List, Set
 import argparse, argcomplete
@@ -8,6 +9,7 @@ import tqdm
 from datetime import datetime
 from dateutil.parser import parse as dateutil_parser
 from dateutil.relativedelta import relativedelta
+from icecream import ic
 
 from firefly_automate import rules
 import firefly_automate.rules.base_rule
@@ -21,6 +23,9 @@ from firefly_automate.miscs import (
     group_by,
     prompt_response,
 )
+
+logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
+LOGGER = logging.getLogger()
 
 pending_updates: Dict[int, PendingUpdates] = {}
 pending_deletes: Set[int] = set()
@@ -95,7 +100,32 @@ parser.add_argument(
     help="String that pass to rule backend",
     type=str,
 )
+parser.add_argument(
+    "--debug",
+    default=False,
+    help="Debug logging",
+    action="store_true",
+)
 argcomplete.autocomplete(parser)
+
+
+def setup_logger():
+    # create logger
+    logger = logging.getLogger("project")
+    logger.setLevel(logging.DEBUG)
+
+    # create console handler and set level to debug
+    ch = logging.StreamHandler()
+    ch.setLevel("DEBUG")
+
+    # create formatter
+    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+
+    # add formatter to ch
+    ch.setFormatter(formatter)
+
+    # add ch to logger
+    logger.addHandler(ch)
 
 
 def main():
@@ -107,6 +137,11 @@ def main():
         return
     if args.run:
         available_rules = list(filter(lambda x: x.base_name == args.run, all_rules))
+    if args.debug:
+        LOGGER.setLevel(logging.DEBUG)
+        setup_logger()
+    else:
+        ic.disable()
 
     def process_one_transaction(entry: FireflyTransactionDataClass):
 
@@ -127,6 +162,8 @@ def main():
     else:
         with open(args.cache_file_name, "rb") as f:
             all_transactions = pickle.load(f)
+
+    ic(all_transactions)
 
     for rule in available_rules:
         rule.set_all_transactions(all_transactions)

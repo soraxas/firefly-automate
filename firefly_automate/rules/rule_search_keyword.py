@@ -43,7 +43,7 @@ class RuleSearchKeyword(Rule):
     def __init__(self, *args, **kwargs):
         super().__init__("search_keyword", *args, **kwargs)
 
-    def process(self, entry: FireflyTransactionDataClass) -> Dict[str, YamlItemType]:
+    def process(self, entry: FireflyTransactionDataClass):
         self._process(entry, "ignore")
         self._process(entry, num_of_token=len(entry.description.split(" - ")))
 

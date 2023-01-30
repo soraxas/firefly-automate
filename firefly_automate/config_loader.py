@@ -49,7 +49,7 @@ main_config_schema = Schema(
         "firefly_iii_token": str,
         "firefly_iii_host": str,
         # various rules will be validated individually within their classes
-        Optional("rules"): Schema(None, {str: object}),
+        Optional("rules"): Schema({str: object}),
         # priority should be a str maps to a list of str
         Optional("mapping_priority"): Schema({str: [str]}),
         Optional("rule_priority"): Schema({str: [str]}),

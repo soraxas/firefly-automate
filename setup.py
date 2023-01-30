@@ -28,7 +28,7 @@ setup(
         "firefly_automate.rules",
     ],
     install_requires=[
-        "Firefly-III-API-Client==1.5.4",
+        "Firefly-III-API-Client==1.5.6",
         "pandas==1.3.1",
         "pyyaml==5.4.1",
         "schema==0.7.4",

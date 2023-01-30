@@ -80,7 +80,7 @@ class Rule:
             ) from e
 
     @abstractmethod
-    def process(self, entry: FireflyTransactionDataClass) -> Dict[str, YamlItemType]:
+    def process(self, entry: FireflyTransactionDataClass):
         raise NotImplementedError()
 
 
