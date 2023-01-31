@@ -24,7 +24,6 @@ from firefly_automate.miscs import (
     prompt_response,
 )
 
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"))
 LOGGER = logging.getLogger()
 
 pending_updates: Dict[int, PendingUpdates] = {}
@@ -111,25 +110,6 @@ parser.add_argument(
 argcomplete.autocomplete(parser)
 
 
-def setup_logger():
-    # create logger
-    logger = logging.getLogger("project")
-    logger.setLevel(logging.DEBUG)
-
-    # create console handler and set level to debug
-    ch = logging.StreamHandler()
-    ch.setLevel("DEBUG")
-
-    # create formatter
-    formatter = logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
-
-    # add formatter to ch
-    ch.setFormatter(formatter)
-
-    # add ch to logger
-    logger.addHandler(ch)
-
-
 def main():
     global available_rules
     args = parser.parse_args()
@@ -139,10 +119,8 @@ def main():
         return
     if args.run:
         available_rules = list(filter(lambda x: x.base_name == args.run, all_rules))
-    if args.debug:
-        LOGGER.setLevel(logging.DEBUG)
-        setup_logger()
-    else:
+    setup_logger(args.debug)
+    if not args.debug:
         ic.disable()
 
     def process_one_transaction(entry: FireflyTransactionDataClass):

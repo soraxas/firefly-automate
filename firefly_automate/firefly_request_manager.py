@@ -9,6 +9,7 @@ from firefly_iii_client.api import accounts_api
 from firefly_iii_client.api import transactions_api
 from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilter
 from firefly_iii_client.model.transaction_update import TransactionUpdate
+from firefly_iii_client.model.transaction_store import TransactionStore
 
 from firefly_automate.config_loader import config, YamlItemType
 from firefly_automate.connections_helpers import (
@@ -63,6 +64,18 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
         except firefly_iii_client.ApiException as e:
             raise TransactionUpdateError(
                 f"Attempting to update transaction {transaction_id}: {transaction_update}"
+            ) from e
+        return api_response
+
+
+def send_transaction_create(transaction_store: TransactionStore):
+    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
+        api_instance = transactions_api.TransactionsApi(api_client)
+        try:
+            api_response = api_instance.store_transaction(transaction_store)
+        except firefly_iii_client.ApiException as e:
+            raise TransactionUpdateError(
+                f"Attempting to store new transaction: {transaction_store}"
             ) from e
         return api_response
 
