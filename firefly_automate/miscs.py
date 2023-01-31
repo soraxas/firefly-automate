@@ -335,7 +335,7 @@ class FireflyIIIRulesConflictException(ValueError):
 
 def setup_logger(debug: bool = False):
     # create logger
-    logger = logging.getLogger("project")
+    logger = logging.getLogger(__name__)
     logger.setLevel(logging.DEBUG if debug else logging.INFO)
 
     # create console handler and set level to debug

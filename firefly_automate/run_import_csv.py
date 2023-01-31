@@ -12,7 +12,6 @@ from firefly_iii_client.api import accounts_api
 from firefly_iii_client.model.transaction_split_store import TransactionSplitStore
 from firefly_iii_client.model.transaction_store import TransactionStore
 from firefly_iii_client.model.transaction_type_property import TransactionTypeProperty
-from icecream import ic
 
 from firefly_automate.connections_helpers import (
     extract_data_from_pager,
@@ -124,9 +123,11 @@ def main():
     args = parser.parse_args()
 
     setup_logger(args.debug)
-    if not args.debug:
-        ic.disable()
 
+    if sys.stdin.isatty() and args.file_input is sys.stdin:
+        parser.print_usage()
+        print(f"{parser.prog}: there was no stdin and no csv file given.")
+        exit(1)
     df = pd.read_csv(args.file_input, skiprows=args.skip_rows)
 
     if args.interpret_int_as_column:

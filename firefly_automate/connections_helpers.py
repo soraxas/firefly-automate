@@ -1,7 +1,4 @@
-from collections import Callable
-from typing import Any, Dict, Iterator
-
-from icecream import ic
+from typing import Any, Dict, Iterator, Callable
 
 import tqdm
 
@@ -86,5 +83,5 @@ def extract_data_from_pager(
     """
     for page in pager_wrapper:
         for d in page["data"]:
-            yield ic(d)
+            yield d
             # yield d.to_dict()

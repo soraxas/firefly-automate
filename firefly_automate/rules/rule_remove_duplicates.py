@@ -1,6 +1,5 @@
 import dataclasses
 
-import pandas as pd
 from schema import Schema
 
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
@@ -46,6 +45,8 @@ class RemoveDuplicates(Rule):
             return
 
         if self.df_transactions is None:
+            import pandas as pd
+
             self.df_transactions = pd.DataFrame(
                 map(lambda x: dataclasses.asdict(x), self.transactions)
             )
