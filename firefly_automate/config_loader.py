@@ -5,6 +5,7 @@ import yaml
 from schema import Schema, Optional
 
 YamlItemType = Union[Dict[str, object], List[object], str, int, None]
+JsonSerializableNonNesting = Union[str, int, List[str], List[int]]
 
 """
 # deprecated

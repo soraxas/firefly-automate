@@ -3,12 +3,22 @@ import pprint
 from abc import abstractmethod
 from typing import Dict, Set
 
-from firefly_automate.config_loader import config, YamlItemType
+from schema import Schema
+
+from firefly_automate.config_loader import config
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
-from firefly_automate.miscs import PendingUpdates, FireflyIIIRulesConflictException
+from firefly_automate.miscs import (
+    PendingUpdates,
+    FireflyIIIRulesConflictException,
+    TransactionUpdateValueType,
+)
 
 
 class Rule:
+    # to be implemented by sub-classed
+    schema: Schema
+    enable_by_default: bool = True
+
     def __init__(
         self,
         base_name: str,
@@ -25,10 +35,6 @@ class Rule:
         except KeyError:
             conf = dict()
         self.config = conf
-
-    @property
-    def enable_by_default(self) -> bool:
-        return True
 
     @property
     def base_name(self) -> str:
@@ -56,7 +62,9 @@ class Rule:
         self.name_suffix = name_suffix
 
     def add_updates(
-        self, entry: FireflyTransactionDataClass, new_attrs: Dict[str, YamlItemType]
+        self,
+        entry: FireflyTransactionDataClass,
+        new_attrs: Dict[str, TransactionUpdateValueType],
     ):
         """Add a new updates to wrt to the entry"""
         # auto wrap a single tag with a list

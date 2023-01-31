@@ -1,10 +1,8 @@
-from typing import Dict
+from schema import Schema, Optional, Or
 
-from firefly_automate.config_loader import YamlItemType
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text
 from firefly_automate.rules.base_rule import Rule
-from schema import Schema, Optional, Or
 
 auto_classify_schema = Schema(
     [
@@ -24,6 +22,7 @@ auto_classify_schema = Schema(
 
 class RuleSearchKeyword(Rule):
     schema = auto_classify_schema
+    enable_by_default: bool = True
 
     def __init__(self, *args, **kwargs):
         super().__init__("classify_transaction", *args, **kwargs)

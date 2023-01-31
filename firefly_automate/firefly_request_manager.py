@@ -1,4 +1,5 @@
 import datetime
+import functools
 import logging
 from typing import Dict, Iterable
 
@@ -37,7 +38,9 @@ def get_firefly_client_conf() -> Configuration:
     return configuration
 
 
+@functools.lru_cache
 def get_firefly_account_mappings() -> Dict[str, str]:
+    """Only retrieve once, and then cache it"""
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = accounts_api.AccountsApi(api_client)
 

@@ -1,14 +1,11 @@
-from typing import Union, Dict
-import pandas as pd
 import dataclasses
 
-from schema import Schema, Optional, Or
+import pandas as pd
+from schema import Schema
 
-from firefly_automate.config_loader import YamlItemType
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
-from firefly_automate.miscs import search_keywords_in_text, get_transaction_owner
-from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
-
+from firefly_automate.miscs import get_transaction_owner
+from firefly_automate.rules.base_rule import Rule
 
 remove_duplicates_schema = Schema(
     [
@@ -21,6 +18,7 @@ remove_duplicates_schema = Schema(
 
 class RemoveDuplicates(Rule):
     schema = remove_duplicates_schema
+    enable_by_default: bool = False
 
     def __init__(self, *args, **kwargs):
         super().__init__("remove_duplicates", *args, **kwargs)
@@ -41,10 +39,6 @@ class RemoveDuplicates(Rule):
                 print(f"- [{', '.join(e[0] for e in entries)}]")
 
         atexit.register(exit_handler)
-
-    @property
-    def enable_by_default(self) -> bool:
-        return False
 
     def process(self, entry: FireflyTransactionDataClass):
         if entry.id in self.delete_master_id or entry.id in self.pending_deletes:

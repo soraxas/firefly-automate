@@ -1,7 +1,7 @@
 import dataclasses
 import datetime
 from dataclasses import dataclass
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 
 @dataclass(init=False)
@@ -32,7 +32,7 @@ class FireflyTransactionDataClass:
     category_id: str
     category_name: str
     reconciled: bool
-    tags: list
+    tags: List[str]
     internal_reference: str
     external_id: str
     original_source: str

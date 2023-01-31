@@ -11,21 +11,19 @@ from typing import (
     Iterable,
     Match,
     AnyStr,
+    Tuple,
 )
 
 import humanize
 from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
-from firefly_automate.config_loader import config
+from firefly_automate.config_loader import config, JsonSerializableNonNesting
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.firefly_request_manager import (
     send_transaction_update,
     get_firefly_account_mappings,
 )
-
-# Globals
-acc_id_to_name: Optional[Dict[str, str]] = None
 
 TransactionUpdateValueType = Union[str, List[str]]
 PendingUpdateValuesDict = Dict[str, TransactionUpdateValueType]
@@ -34,15 +32,22 @@ PendingUpdateValuesDict = Dict[str, TransactionUpdateValueType]
 @dataclass
 class PendingUpdateItem:
     rule: str
-    new_val: str
+    new_val: TransactionUpdateValueType
 
     def __eq__(self, other):
         if type(self) is type(other):
+            if isinstance(self, list):
+                return all(a == b for a, b in zip(self, other))
+            # str
             return self.new_val == other.new_val
         raise NotImplementedError()
 
 
 class PendingUpdates:
+    """
+    Represents all pending updates that are going to apply on this transaction.
+    """
+
     def __init__(
         self,
         entry: FireflyTransactionDataClass,
@@ -68,10 +73,12 @@ class PendingUpdates:
         return len(self.updates) == 0
 
     def get_transaction_update(self) -> TransactionUpdate:
-        _updates = {k: v.new_val for k, v in self.updates.items()}
+        _updates: Dict[str, JsonSerializableNonNesting] = {
+            k: v.new_val for k, v in self.updates.items()
+        }
         if "tags" in _updates and self.merge_tags:
             _tags = _updates["tags"]
-            _updates["tags"] = list(set(self.entry.tags) | set(_tags))
+            _updates["tags"] = list(set(self.entry.tags) | set(_tags))  # type: ignore
 
         # add transaction_journal_id to indicate the update on the potentially split
         # see https://github.com/firefly-iii/firefly-iii/issues/5610
@@ -88,12 +95,12 @@ class PendingUpdates:
         return transaction_update
 
     def append_updates(self, rule: str, updates: PendingUpdateValuesDict):
-        updates = self.sanitise_updates(rule, updates)
+        updates_by_rule = self.sanitise_updates(rule, updates)
 
         updates_that_allows_duplicates = {"tags"}
         union_set = (
             set(self.updates.keys())
-            & set(updates.keys()) - updates_that_allows_duplicates
+            & set(updates_by_rule.keys()) - updates_that_allows_duplicates
         )
         # remove key from union set if the keys are the same in both updates
         for key in list(union_set):  # list to prevent size change during iteration
@@ -108,25 +115,26 @@ class PendingUpdates:
                         "rule_priority"
                     ][key].index(self.updates[key].rule):
                         # use existing value
-                        updates.pop(key)
+                        updates_by_rule.pop(key)
                     else:
                         # use new value
                         self.updates.pop(key)
 
         # resolve conflict if there are preset rule priority in the config file
         for key in list(union_set):
-            if self.updates[key] == updates[key]:
+            if self.updates[key] == updates_by_rule[key]:
                 union_set -= {key}
         if len(union_set) > 0:
+            key = union_set.pop()  # get one of the key
             raise FireflyIIIRulesConflictException(
                 self.updates[key].rule,
                 rule,
                 self.updates,
-                updates
+                updates_by_rule
                 # ' & '.join(self._rules), rule, self.updates, updates
             )
         self._rules.append(rule)
-        for k, v in updates.items():
+        for k, v in updates_by_rule.items():
             # self.updates[k] = PendingUpdateItem(rule, v)
             self.updates[k] = v
         # self.updates.update(updates)
@@ -156,7 +164,9 @@ class PendingUpdates:
                 ret += f"        > {k}:\t{self.entry[k]}\t=>\t{v.new_val}\n"
         return ret
 
-    def sanitise_updates(self, rule_name: str, dictionary: PendingUpdateValuesDict):
+    def sanitise_updates(
+        self, rule_name: str, dictionary: PendingUpdateValuesDict
+    ) -> Dict[str, PendingUpdateItem]:
         """Skip any items that are the same as the current value"""
         # apply nice name mappings
         for key in ["source_name", "destination_name"]:
@@ -166,6 +176,7 @@ class PendingUpdates:
         # remove duplicates values
         ret = {}
         for k, v in dictionary.items():
+            # if we are updating tag, check if the new tag already exists
             if k == "tags":
                 potential_tags = []
                 for tag in v:
@@ -173,6 +184,7 @@ class PendingUpdates:
                         potential_tags.append(tag)
                 if len(potential_tags) == 0:
                     continue
+            # check if the value-to-be-update is the same as the current one
             else:
                 if self.entry[k] == v:
                     continue
@@ -212,13 +224,15 @@ class PendingUpdates:
         return get_transaction_owner(self.entry, True)
 
 
+TransactionOwnerReturnType = Union[str, Tuple[str, str]]
+
+
 def get_transaction_owner(
     entry: FireflyTransactionDataClass,
-    actual_name=False,
-):
-    global acc_id_to_name
-    if acc_id_to_name is None:
-        acc_id_to_name = get_firefly_account_mappings()
+    actual_name: bool = False,
+) -> TransactionOwnerReturnType:
+    belongs_to: TransactionOwnerReturnType
+    acc_id_to_name = get_firefly_account_mappings()
     if entry.type == "withdrawal":
         belongs_to = entry.source_id
     elif entry.type == "deposit":
@@ -232,6 +246,7 @@ def get_transaction_owner(
     if actual_name:
         if type(belongs_to) is tuple:
             return acc_id_to_name[belongs_to[0]], acc_id_to_name[belongs_to[1]]
+        assert isinstance(belongs_to, str)
         return acc_id_to_name[belongs_to]
     return belongs_to
 
@@ -244,7 +259,7 @@ def group_by(
 ) -> Dict[str, List[T]]:
     """Given a list of items and a functor that extract the item's identity, we will
     return a dictionary that are grouped by that identity."""
-    grouped = {}
+    grouped: Dict[str, List[T]] = {}
     for item in list_of_items:
         identity = functor(item)
         if functor(item) not in grouped:
@@ -255,7 +270,7 @@ def group_by(
 
 def search_keywords_in_text(
     text_to_search: Optional[str], keywords: Union[str, List[str]]
-) -> Union[bool, Match[AnyStr]]:
+) -> Union[bool, Match[str]]:
     """Return true or false depending on whether the token is found."""
     if type(keywords) is list:
         _keyword = "|".join(f"({re.escape(k)})" for k in keywords)
@@ -287,11 +302,22 @@ def prompt_response(msg: str):
 
 
 class FireflyIIIRulesConflictException(ValueError):
-    def __init__(self, rule1, rule2, updates1, updates2):
+    def __init__(
+        self,
+        rule1: str,
+        rule2: str,
+        updates1: Dict,
+        updates2: Dict,
+    ):
         self.rule1 = rule1
         self.rule2 = rule2
         self.updates1 = updates1
         self.updates2 = updates2
+
+        def _format_update(update: dict) -> str:
+            return pprint.pformat(
+                {k: v.new_val for k, v in self.updates1.items()}, indent=2, width=40
+            )
 
         self.message = (
             f"\n"
@@ -299,8 +325,8 @@ class FireflyIIIRulesConflictException(ValueError):
             f" - {self.rule1}\n"
             f" - {self.rule2}\n"
             f"With the updates:\n"
-            f"{pprint.pformat({k: v.new_val for k, v in self.updates1.items()}, indent=2, width=40)}\n"
-            f"{pprint.pformat({k: v.new_val for k, v in self.updates2.items()}, indent=2, width=40)}\n"
+            f"{_format_update(self.updates1)}\n"
+            f"{_format_update(self.updates2)}\n"
         )
 
         super().__init__(self.message)

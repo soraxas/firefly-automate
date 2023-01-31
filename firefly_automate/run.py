@@ -30,7 +30,9 @@ LOGGER = logging.getLogger()
 pending_updates: Dict[int, PendingUpdates] = {}
 pending_deletes: Set[int] = set()
 all_rules = [
-    cls(pending_updates=pending_updates, pending_deletes=pending_deletes)
+    cls(
+        pending_updates=pending_updates, pending_deletes=pending_deletes  # type: ignore
+    )
     for cls in rules.base_rule.Rule.__subclasses__()
     if cls.enable_by_default
 ]
