@@ -8,4 +8,4 @@ sys.path.insert(0, str(thisfile.parent / "firefly_automate"))
 
 import firefly_automate.run_transform_transactions
 
-firefly_automate.run.main()
+firefly_automate.run_transform_transactions.main()

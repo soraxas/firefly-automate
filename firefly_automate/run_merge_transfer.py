@@ -5,6 +5,8 @@ import pickle
 from typing import Dict, List, Set
 import argparse, argcomplete
 
+import pandas as pd
+import pytz
 import tqdm
 from datetime import datetime
 from dateutil.parser import parse as dateutil_parser
@@ -33,6 +35,7 @@ all_rules = [
         pending_updates=pending_updates, pending_deletes=pending_deletes  # type: ignore
     )
     for cls in rules.base_rule.Rule.__subclasses__()
+    if cls.enable_by_default
 ]
 all_rules_name = list(map(lambda r: r.base_name, all_rules))
 available_rules = list(filter(lambda x: x.enable_by_default, all_rules))
@@ -139,7 +142,108 @@ def main():
         with open(args.cache_file_name, "rb") as f:
             all_transactions = pickle.load(f)
 
-    LOGGER.debug(all_transactions)
+    from icecream import ic
+
+    df = pd.DataFrame(
+        [
+            [
+                t.type,
+                t.date,
+                t.id,
+                t.description,
+                t.amount,
+                t.source_name,
+                t.destination_name,
+            ]
+            for t in all_transactions
+        ],
+        columns=["type", "date", "id", "desc", "amount", "source", "dest"],
+    )
+
+    df["date"] = pd.to_datetime(df["date"], infer_datetime_format=True)
+
+    import numpy as np
+
+    ic(all_transactions[-2:])
+
+    ic(df)
+
+    withdrawal = df[df["type"] == "withdrawal"]
+    deposit = df[df["type"] == "deposit"]
+
+    ic(withdrawal)
+    ic(deposit)
+
+    MAX_DAYS_DIFF = 1
+    MAX_DAYS_DIFF = 0
+    MAX_AMOUNT_DIFF = 1e-4
+
+    amount_different = np.abs(
+        np.asarray(withdrawal["amount"].astype(float))[:, np.newaxis]
+        - np.asarray(deposit["amount"].astype(float))
+    )
+
+    ic(amount_different)
+
+    out = np.asarray(withdrawal["date"])[:, None] - np.asarray(deposit["date"])
+    days_different = np.abs(np.vectorize(lambda x: x.days)(out))
+
+    print(out.shape)
+    ic(out.dtype)
+
+    from collections import defaultdict
+
+    all_potential_match = dict()
+
+    count = 0
+
+    for withdrawal_idx in range(amount_different.shape[0]):
+        # potential match based on date being similar
+        potential_match_deposit_indices = np.where(
+            amount_different[withdrawal_idx, :] <= MAX_AMOUNT_DIFF
+        )[0]
+
+        if len(potential_match_deposit_indices) > 0:
+            import pytz
+
+            withdrawal_date = withdrawal.iloc[withdrawal_idx]["date"].astimezone(
+                tz=pytz.UTC
+            )
+            deposit_dates = deposit.iloc[potential_match_deposit_indices]["date"].apply(
+                lambda x: x.astimezone(tz=pytz.UTC)
+            )
+
+            withdrawal_deposit_pair_diff = np.abs(
+                withdrawal_date - deposit_dates
+            ).apply(lambda x: x.days)
+            potential_match_by_date = deposit.iloc[potential_match_deposit_indices][
+                withdrawal_deposit_pair_diff <= MAX_DAYS_DIFF
+            ]
+
+            # ic(potential_match_by_date)
+            if len(potential_match_by_date) > 0:
+                out = np.asarray(withdrawal["date"])[:, None] - np.asarray(
+                    deposit["date"]
+                )
+                days_different = np.abs(np.vectorize(lambda x: x.days)(out))
+
+                all_potential_match[withdrawal_idx] = potential_match_deposit_indices
+                # ic(withdrawal_idx, potential_match_deposit_indices)
+                #
+                # ic(withdrawal.iloc[withdrawal_idx]['date'])
+                # ic(deposit.iloc[potential_match_by_date])
+                print(withdrawal.iloc[withdrawal_idx].to_frame().T.to_markdown())
+                print(potential_match_by_date.to_markdown())
+
+                print()
+                count += 1
+                if count > 20:
+                    exit()
+
+    ic(all_potential_match)
+    # print(withdrawal['date'] - deposit['date'])
+
+    exit()
 
     for rule in available_rules:
         rule.set_all_transactions(all_transactions)

@@ -66,7 +66,6 @@ class RemoveDuplicates(Rule):
         assert len(potential_duplicates) >= 1, "Logic error?"
         assert int(entry.id) in set(potential_duplicates.id.astype(int)), "Logic error?"
         if len(potential_duplicates) > 1:
-
             all_ids = set(potential_duplicates.id.astype(int))
             if any(
                 len(all_ids.difference(ids)) == 0
