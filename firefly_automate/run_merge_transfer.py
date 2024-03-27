@@ -144,6 +144,8 @@ def main():
 
     from icecream import ic
 
+    IDS_to_transaction = {t.id: t for t in all_transactions}
+
     df = pd.DataFrame(
         [
             [
@@ -186,7 +188,7 @@ def main():
     ic(amount_different)
 
     out = np.asarray(withdrawal["date"])[:, None] - np.asarray(deposit["date"])
-    days_different = np.abs(np.vectorize(lambda x: x.days)(out))
+    # days_different = np.abs(np.vectorize(lambda x: x.days)(out))
 
     print(out.shape)
     ic(out.dtype)
@@ -232,13 +234,73 @@ def main():
                 #
                 # ic(withdrawal.iloc[withdrawal_idx]['date'])
                 # ic(deposit.iloc[potential_match_by_date])
+
+                print("===============================")
                 print(withdrawal.iloc[withdrawal_idx].to_frame().T.to_markdown())
                 print(potential_match_by_date.to_markdown())
 
-                print()
-                count += 1
-                if count > 20:
-                    exit()
+                print(potential_match_by_date.iloc[0].dest)
+
+                canidate_transfer_from = withdrawal.iloc[withdrawal_idx]
+                canidate_transfer_to = potential_match_by_date.iloc[0]
+
+                from firefly_automate.firefly_request_manager import (
+                    update_rule_action,
+                    get_merge_as_transfer_rule_id,
+                )
+
+                update_rule_action(
+                    id=get_merge_as_transfer_rule_id(),
+                    action_packs=[
+                        (
+                            "convert_transfer",
+                            canidate_transfer_to.dest,
+                        ),
+                        (
+                            "remove_tag",
+                            "AUTOMATE_convert-as-transfer",
+                        ),
+                    ],
+                )
+
+                pending_updates = [
+                    PendingUpdates(
+                        IDS_to_transaction[canidate_transfer_from.id],
+                        "merging",
+                        apply_rule=True,
+                        updates_kwargs=dict(
+                            description=f"[{canidate_transfer_from.desc}] > [{canidate_transfer_to.desc}]",
+                            tags=["AUTOMATE_convert-as-transfer"],
+                        ),
+                    ),
+                    # PendingUpdates(
+                    #     IDS_to_transaction[canidate_transfer_to.id],
+                    #     "merging",
+                    #     updates_kwargs=dict(
+                    #         tags=["AUTOMATE_delete"]
+                    #     ),
+                    # ),
+                ]
+
+                print("========================")
+                for pending_update in pending_updates:
+                    print(pending_update)
+
+                if prompt_response(
+                    ">> IMPORTANT: Review the above output and see if the updates are ok:"
+                ):
+
+                    for updates in tqdm.tqdm(pending_updates, desc="Applying updates"):
+                        updates.apply(dry_run=False)
+
+                    send_transaction_delete(canidate_transfer_to.id)
+
+                # print()
+                # exit()
+
+                # count += 1
+                # if count > 20:
+                #     exit()
 
     ic(all_potential_match)
     # print(withdrawal['date'] - deposit['date'])
@@ -270,19 +332,17 @@ def main():
                     print(updates)
 
         print("=========================")
-        if not args.yes:
-            prompt_response(
-                ">> IMPORTANT: Review the above output and see if the updates are ok:"
-            )
+        if args.yes or prompt_response(
+            ">> IMPORTANT: Review the above output and see if the updates are ok:"
+        ):
 
-        for updates in tqdm.tqdm(pending_updates.values(), desc="Applying updates"):
-            updates.apply(dry_run=False)
+            for updates in tqdm.tqdm(pending_updates.values(), desc="Applying updates"):
+                updates.apply(dry_run=False)
 
     elif len(pending_deletes) > 0:
-        if not args.yes:
-            prompt_response(">> Ready to perform the delete?")
-        for deletes_id in tqdm.tqdm(pending_deletes, desc="Applying deletes"):
-            send_transaction_delete(int(deletes_id))
+        if args.yes or prompt_response(">> Ready to perform the delete?"):
+            for deletes_id in tqdm.tqdm(pending_deletes, desc="Applying deletes"):
+                send_transaction_delete(int(deletes_id))
 
 
 if __name__ == "__main__":
