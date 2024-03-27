@@ -5,7 +5,8 @@ import pickle
 from typing import Dict, List, Set
 import argparse, argcomplete
 
-import tqdm
+from . import miscs
+
 from datetime import datetime
 from dateutil.parser import parse as dateutil_parser
 from dateutil.relativedelta import relativedelta
@@ -77,6 +78,12 @@ parser.add_argument(
     help="Debug logging",
     action="store_true",
 )
+parser.add_argument(
+    "--always-override-reconciled",
+    default=False,
+    help="Debug logging",
+    action="store_true",
+)
 
 ########################################################
 
@@ -110,6 +117,7 @@ def init(args: argparse.ArgumentParser):
         args.end = args.start + relativedelta(months=args.relative_months)
     print(f"From: {args.start} to {args.end}")
     ####################################
+    miscs.always_override_reconciled = args.always_override_reconciled
 
     setup_logger(args.debug)
 

@@ -14,6 +14,8 @@ from firefly_iii_client.model.rule_store import RuleStore
 from firefly_iii_client.model.rule_trigger_type import RuleTriggerType
 from firefly_iii_client.model.rule_action_store import RuleActionStore
 from firefly_iii_client.model.rule_action_keyword import RuleActionKeyword
+from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
+
 
 from firefly_iii_client.model.rule_trigger_store import RuleTriggerStore
 from firefly_iii_client.model.rule_trigger_keyword import RuleTriggerKeyword
@@ -190,16 +192,50 @@ def get_firefly_account_mappings() -> Dict[str, str]:
 
 
 def send_transaction_update(transaction_id: int, transaction_update: TransactionUpdate):
+
+    def _raw_send(_id, _tran_update):
+        return api_instance.update_transaction(str(_id), _tran_update)
+
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = transactions_api.TransactionsApi(api_client)
         try:
-            api_response = api_instance.update_transaction(
-                str(transaction_id), transaction_update
-            )
+            api_response = _raw_send(transaction_id, transaction_update)
         except firefly_iii_client.ApiException as e:
-            raise TransactionUpdateError(
-                f"Attempting to update transaction {transaction_id}: {transaction_update}"
-            ) from e
+            if "This transaction is already reconciled" in e.body:
+
+                from . import miscs
+
+                if miscs.always_override_reconciled or miscs.prompt_response(
+                    f"> Transaction {transaction_id} is already reconciled. Override?"
+                ):
+
+                    # first remove reconcile
+                    api_response = _raw_send(
+                        transaction_id,
+                        TransactionUpdate(
+                            apply_rules=False,
+                            transactions=[
+                                TransactionSplitUpdate(reconciled=False),
+                            ],
+                        ),
+                    )
+
+                    # re-send request.
+                    api_response = _raw_send(transaction_id, transaction_update)
+
+                    api_response = _raw_send(
+                        transaction_id,
+                        TransactionUpdate(
+                            apply_rules=False,
+                            transactions=[
+                                TransactionSplitUpdate(reconciled=True),
+                            ],
+                        ),
+                    )
+            else:
+                raise TransactionUpdateError(
+                    f"Attempting to update transaction {transaction_id}: {transaction_update}"
+                ) from e
         return api_response
 
 
