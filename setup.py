@@ -30,12 +30,12 @@ setup(
     install_requires=[
         "Firefly-III-API-Client==1.5.6",
         "pandas>=1.3.1",
-        "pyyaml==5.4.1",
-        "schema==0.7.4",
+        "pyyaml>=5.4.1",
+        "schema>=0.7.4",
         "tqdm~=4.62.0",
         "python-dateutil~=2.8.2",
         "humanize~=3.11.0",
-        "argcomplete==1.12.3",
+        "argcomplete>=1.12.3",
         "tabulate",
     ],
     entry_points={

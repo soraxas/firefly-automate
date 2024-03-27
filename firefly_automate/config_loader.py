@@ -56,6 +56,7 @@ main_config_schema = Schema(
         Optional("rule_priority"): Schema({str: [str]}),
         # the mapping should be a string map to a string
         Optional("vendor_name_mappings"): Schema({str: str}),
+        Optional("ignore_transaction_ids"): Schema([int]),
     }
 )
 
@@ -69,3 +70,6 @@ with open(os.path.expanduser("~/.config/firefly-automate/config.yaml")) as file:
         if val is not None:
             config[key] = val
     config = main_config_schema.validate(config)
+    config["ignore_transaction_ids"] = set(
+        map(str, config.get("ignore_transaction_ids", []))
+    )

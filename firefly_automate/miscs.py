@@ -131,7 +131,7 @@ class PendingUpdates:
                 self.updates[key].rule,
                 rule,
                 self.updates,
-                updates_by_rule
+                updates_by_rule,
                 # ' & '.join(self._rules), rule, self.updates, updates
             )
         self._rules.append(rule)
@@ -155,7 +155,9 @@ class PendingUpdates:
         ret = f""
         # ret += f"      id: {self.entry.id}\n"
         # ret += f"    rule: {self.rule}\n"
-        ret += f"    date: " f"{humanize.naturaldate(self.date)}\n"
+        ret += (
+            f"  > date: " f"{humanize.naturaldate(self.date)}  |  id: {self.entry.id}\n"
+        )
         ret += f"    desc: {self.entry.description}\n"
         for k, v in self.updates.items():
             if k == "tags":
@@ -297,9 +299,10 @@ def prompt_response(msg: str):
     except KeyboardInterrupt:
         print()
         pass
-    if abort:
-        print("Aborting...")
-        exit(1)
+    # if abort:
+    #     print("Aborting...")
+    #     exit(1)
+    return not abort
 
 
 class FireflyIIIRulesConflictException(ValueError):

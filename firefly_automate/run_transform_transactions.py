@@ -12,6 +12,7 @@ from dateutil.relativedelta import relativedelta
 
 from firefly_automate import rules
 import firefly_automate.rules.base_rule
+from firefly_automate.config_loader import config
 from firefly_automate.firefly_request_manager import (
     get_transactions,
     send_transaction_delete,
@@ -67,16 +68,16 @@ parser.add_argument(
 parser.add_argument(
     "-s",
     "--start",
-    default=(datetime.now() - relativedelta(month=3)).date(),
+    default=None,
     help="Start date for the range of transactions to process (default 3 months ago)",
-    type=lambda x: dateutil_parser(x).date(),
+    type=lambda x: dateutil_parser(x, dayfirst=True).date(),
 )
 parser.add_argument(
     "-e",
     "--end",
-    default=datetime.now().date(),
+    default=None,
     help="End date for the range of transactions to process",
-    type=lambda x: dateutil_parser(x).date(),
+    type=lambda x: dateutil_parser(x, dayfirst=True).date(),
 )
 parser.add_argument(
     "--wait-for-all-transaction",
@@ -113,6 +114,16 @@ def main():
     global available_rules
     args = parser.parse_args()
 
+    ####################################
+    # if all is None, default to most recent 3 months
+    if all(x is None for x in (args.start, args.end)):
+        args.end = datetime.now().date()
+    if args.start is None and args.end is not None:
+        args.start = args.end - relativedelta(month=3)
+    elif args.start is not None and args.end is None:
+        args.end = args.start + relativedelta(month=3)
+    ####################################
+
     if args.list_rules:
         print("\n".join(all_rules_name))
         return
@@ -145,7 +156,9 @@ def main():
         rule.set_all_transactions(all_transactions)
         rule.set_rule_config(args.rule_config)
     # TODO: make this parallel if num of transactions is huge
-    for data in all_transactions:
+    for data in filter(
+        lambda t: t.id not in config["ignore_transaction_ids"], all_transactions
+    ):
         process_one_transaction(data)
 
     print("========================")
@@ -166,19 +179,17 @@ def main():
                     print(updates)
 
         print("=========================")
-        if not args.yes:
-            prompt_response(
-                ">> IMPORTANT: Review the above output and see if the updates are ok:"
-            )
+        if args.yes or prompt_response(
+            ">> IMPORTANT: Review the above output and see if the updates are ok:"
+        ):
 
-        for updates in tqdm.tqdm(pending_updates.values(), desc="Applying updates"):
-            updates.apply(dry_run=False)
+            for updates in tqdm.tqdm(pending_updates.values(), desc="Applying updates"):
+                updates.apply(dry_run=False)
 
     elif len(pending_deletes) > 0:
-        if not args.yes:
-            prompt_response(">> Ready to perform the delete?")
-        for deletes_id in tqdm.tqdm(pending_deletes, desc="Applying deletes"):
-            send_transaction_delete(int(deletes_id))
+        if args.yes or prompt_response(">> Ready to perform the delete?"):
+            for deletes_id in tqdm.tqdm(pending_deletes, desc="Applying deletes"):
+                send_transaction_delete(int(deletes_id))
 
 
 if __name__ == "__main__":
