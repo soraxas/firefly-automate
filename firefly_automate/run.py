@@ -63,6 +63,13 @@ parser.add_argument(
     action="store_true",
     help="If set, store and use previously stored cache file",
 )
+parser.add_argument(
+    "-m",
+    "--relative-months",
+    default=3,
+    action="store_true",
+    help="If `start` or `end` is not given, a relative time of this many months will be used.",
+)
 
 parser.add_argument(
     "--debug",
@@ -98,9 +105,10 @@ def init(args: argparse.ArgumentParser):
     if all(x is None for x in (args.start, args.end)):
         args.end = datetime.now().date()
     if args.start is None and args.end is not None:
-        args.start = args.end - relativedelta(month=3)
+        args.start = args.end - relativedelta(months=args.relative_months)
     elif args.start is not None and args.end is None:
-        args.end = args.start + relativedelta(month=3)
+        args.end = args.start + relativedelta(months=args.relative_months)
+    print(f"From: {args.start} to {args.end}")
     ####################################
 
     setup_logger(args.debug)
