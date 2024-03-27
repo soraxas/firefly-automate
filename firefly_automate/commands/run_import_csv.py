@@ -26,74 +26,6 @@ from firefly_automate.miscs import (
 )
 from firefly_automate.miscs import setup_logger
 
-LOGGER = logging.getLogger()
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--yes",
-    action="store_true",
-    help="Assume yes to all confirmations",
-)
-parser.add_argument(
-    "file_input",
-    type=str,
-    nargs="?",
-    help="target csv file (or read from stdin)",
-    default=sys.stdin,
-)
-parser.add_argument(
-    "-s",
-    "--skip-rows",
-    help="skip rows",
-    type=int,
-    default=0,
-)
-parser.add_argument(
-    "-d", "--drop", help="drop columns", default=[], nargs="+", type=str
-)
-parser.add_argument(
-    "-t",
-    "--as-datetime",
-    help="columns to interpret as datetime format",
-    default=[],
-    nargs="+",
-    type=str,
-)
-parser.add_argument(
-    "-f",
-    "--as-float",
-    help="columns to interpret as float",
-    default=[],
-    nargs="+",
-    type=str,
-)
-parser.add_argument(
-    "-i",
-    "--no-interpret-int-as-column",
-    help="interpret integer as column index",
-    default=True,
-    dest="interpret_int_as_column",
-    action="store_false",
-)
-parser.add_argument(
-    "--source-name",
-    help="source account name",
-    type=str,
-)
-parser.add_argument(
-    "--destination-name",
-    help="destination account name",
-    type=str,
-)
-
-parser.add_argument(
-    "--debug",
-    default=False,
-    help="Debug logging",
-    action="store_true",
-)
-argcomplete.autocomplete(parser)
-
 
 def transform_col_index_to_name(df: pd.DataFrame, columns: List[str]) -> Iterable[str]:
     for col in columns:
@@ -119,11 +51,69 @@ def filter_map_input_to_transaction_store_input(key: str, value: Any):
         return value  # default
 
 
-def main():
-    args = parser.parse_args()
+command_name = "import_csv"
 
-    setup_logger(args.debug)
+parser = None
 
+
+def init_subparser(_parser):
+    global parser
+    parser = _parser
+
+    parser.add_argument(
+        "file_input",
+        type=str,
+        nargs="?",
+        help="target csv file (or read from stdin)",
+        default=sys.stdin,
+    )
+    parser.add_argument(
+        "-s",
+        "--skip-rows",
+        help="skip rows",
+        type=int,
+        default=0,
+    )
+    parser.add_argument(
+        "-d", "--drop", help="drop columns", default=[], nargs="+", type=str
+    )
+    parser.add_argument(
+        "-t",
+        "--as-datetime",
+        help="columns to interpret as datetime format",
+        default=[],
+        nargs="+",
+        type=str,
+    )
+    parser.add_argument(
+        "-f",
+        "--as-float",
+        help="columns to interpret as float",
+        default=[],
+        nargs="+",
+        type=str,
+    )
+    parser.add_argument(
+        "-i",
+        "--no-interpret-int-as-column",
+        help="interpret integer as column index",
+        default=True,
+        dest="interpret_int_as_column",
+        action="store_false",
+    )
+    parser.add_argument(
+        "--source-name",
+        help="source account name",
+        type=str,
+    )
+    parser.add_argument(
+        "--destination-name",
+        help="destination account name",
+        type=str,
+    )
+
+
+def run(args: argparse.ArgumentParser):
     if sys.stdin.isatty() and args.file_input is sys.stdin:
         parser.print_usage()
         print(f"{parser.prog}: there was no stdin and no csv file given.")
@@ -138,7 +128,10 @@ def main():
     if len(args.drop) > 0:
         df = df.drop(columns=list(args.drop))
     for col in args.as_datetime:
-        df[col] = pd.to_datetime(df[col], infer_datetime_format=True)
+        df[col] = pd.to_datetime(
+            df[col],
+            # infer_datetime_format=True,
+        )
 
     for col in args.as_float:
         df[col] = df[col].apply(filter_clean_dollar_format)
@@ -220,7 +213,3 @@ def main():
     if input("Looks Good?: [y/N]").lower() == "y":
         for new_transaction in tqdm.tqdm(new_transactions):
             send_transaction_create(new_transaction)
-
-
-if __name__ == "__main__":
-    main()

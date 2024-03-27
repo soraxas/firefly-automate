@@ -40,7 +40,8 @@ setup(
     ],
     entry_points={
         "console_scripts": [
-            "firefly-automate=firefly_automate.run_transform_transactions:main",
+            "firefly-automate=firefly_automate.run:main",
+            # "firefly-automate=firefly_automate.run_transform_transactions:main",
             "firefly-import-csv=firefly_automate.run_import_csv:main",
         ]
     },

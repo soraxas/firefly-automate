@@ -1,9 +1,8 @@
 #!/bin/env python
 import os
 import logging
-import pickle
 from typing import Dict, List, Set
-import argparse, argcomplete
+import argparse
 
 import pytz
 import tqdm
@@ -12,22 +11,12 @@ import numpy as np
 
 from dataclasses import dataclass
 import pandas as pd
-from datetime import datetime
-from dateutil.parser import parse as dateutil_parser
-from dateutil.relativedelta import relativedelta
 
-from firefly_automate import rules
-import firefly_automate.rules.base_rule
 from firefly_automate.firefly_request_manager import (
-    get_transactions,
     send_transaction_delete,
 )
 from firefly_automate.miscs import (
-    FireflyTransactionDataClass,
     PendingUpdates,
-    group_by,
-    prompt_response,
-    setup_logger,
 )
 
 from firefly_automate.firefly_request_manager import (
@@ -37,89 +26,6 @@ from firefly_automate.firefly_request_manager import (
 
 
 LOGGER = logging.getLogger()
-
-pending_updates: Dict[int, PendingUpdates] = {}
-pending_deletes: Set[int] = set()
-all_rules = [
-    cls(
-        pending_updates=pending_updates, pending_deletes=pending_deletes  # type: ignore
-    )
-    for cls in rules.base_rule.Rule.__subclasses__()
-    if cls.enable_by_default
-]
-all_rules_name = list(map(lambda r: r.base_name, all_rules))
-available_rules = list(filter(lambda x: x.enable_by_default, all_rules))
-available_rules_name = list(map(lambda r: r.base_name, available_rules))
-
-parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--yes",
-    action="store_true",
-    help="Assume yes to all confirmations",
-)
-parser.add_argument(
-    "--run",
-    choices=all_rules_name,
-    help="Only run the specified rule",
-    type=str,
-)
-parser.add_argument(
-    "-d",
-    "--disable",
-    default=[],
-    nargs="+",
-    choices=available_rules_name,
-    help="Disable the following rules",
-    type=str,
-)
-parser.add_argument(
-    "--list-rules",
-    action="store_true",
-    help="List all available rules' base-name and then exit",
-)
-parser.add_argument(
-    "-s",
-    "--start",
-    default=(datetime.now() - relativedelta(month=3)).date(),
-    help="Start date for the range of transactions to process (default 3 months ago)",
-    type=lambda x: dateutil_parser(x).date(),
-)
-parser.add_argument(
-    "-e",
-    "--end",
-    default=datetime.now().date(),
-    help="End date for the range of transactions to process",
-    type=lambda x: dateutil_parser(x).date(),
-)
-parser.add_argument(
-    "--wait-for-all-transaction",
-    action="store_true",
-    help="If set, wait for all transactions' arrival before applying rules",
-)
-parser.add_argument(
-    "--cache-file-name",
-    default="__firefly-iii_automate_cache.pkl",
-    help="File name to be used for cache purpose.",
-    type=str,
-)
-parser.add_argument(
-    "--use-cache",
-    action="store_true",
-    help="If set, store and use previously stored cache file",
-)
-parser.add_argument(
-    "--rule-config",
-    default="",
-    help="String that pass to rule backend",
-    type=str,
-)
-parser.add_argument(
-    "--debug",
-    default=False,
-    help="Debug logging",
-    action="store_true",
-)
-argcomplete.autocomplete(parser)
 
 
 @dataclass
@@ -134,6 +40,12 @@ MAX_DAYS_DIFF = 1
 MAX_DAYS_DIFF = 3
 MAX_AMOUNT_DIFF = 1e-4
 BATCH_SIZE = 5
+
+command_name = "merge"
+
+
+def init_subparser(parser):
+    pass
 
 
 def process_in_batch(pending_updates: List[MergingRequest]):
@@ -196,42 +108,15 @@ def process_in_batch(pending_updates: List[MergingRequest]):
                 break
             print_pending_updates(pending_updates)
 
-    pending_deletes.clear()
+    # pending_deletes.clear()
 
 
 def print_df(df: pd.DataFrame):
     print(df.fillna("").to_markdown(index=False, floatfmt=".2f"))
 
 
-def main():
-    global available_rules
-    args = parser.parse_args()
-
-    if args.list_rules:
-        print("\n".join(all_rules_name))
-        return
-    if args.run:
-        available_rules = list(filter(lambda x: x.base_name == args.run, all_rules))
-    setup_logger(args.debug)
-
-    def process_one_transaction(entry: FireflyTransactionDataClass):
-        try:
-            for rule in available_rules:
-                if rule.base_name in args.disable:
-                    continue
-                rule.process(entry)
-        except rules.base_rule.StopRuleProcessing:
-            pass
-
-    if not args.use_cache or not os.path.exists(args.cache_file_name):
-        all_transactions = list(get_transactions(args.start, args.end))
-
-        # if args.use_cache:
-        with open(args.cache_file_name, "wb") as f:
-            pickle.dump(all_transactions, f)
-    else:
-        with open(args.cache_file_name, "rb") as f:
-            all_transactions = pickle.load(f)
+def run(args: argparse.ArgumentParser):
+    all_transactions = args.get_transactions()
 
     IDS_to_transaction = {t.id: t for t in all_transactions}
 
@@ -250,7 +135,10 @@ def main():
         ],
         columns=["type", "date", "id", "desc", "amount", "source", "dest"],
     )
-    df["date"] = pd.to_datetime(df["date"], infer_datetime_format=True)
+    df["date"] = pd.to_datetime(
+        df["date"],
+        # infer_datetime_format=True,
+    )
 
     withdrawal = df[df["type"] == "withdrawal"]
     deposit = df[df["type"] == "deposit"]
@@ -260,7 +148,7 @@ def main():
         - np.asarray(deposit["amount"].astype(float))
     )
 
-    DELETED_ID = set()
+    PENDING_DELETE_ID = set()
 
     process_Q = []
     for withdrawal_idx in range(amount_different.shape[0]):
@@ -293,7 +181,7 @@ def main():
 
             # remove any matches that had already been deleted
             potential_match_by_date = potential_match_by_date[
-                ~potential_match_by_date.id.isin(DELETED_ID)
+                ~potential_match_by_date.id.isin(PENDING_DELETE_ID)
             ]
 
             if len(potential_match_by_date) > 0:
@@ -358,9 +246,5 @@ def main():
                     process_in_batch(process_Q)
                     process_Q.clear()
 
-                DELETED_ID.add(canidate_transfer_to.id)
+                PENDING_DELETE_ID.add(canidate_transfer_to.id)
     process_in_batch(process_Q)
-
-
-if __name__ == "__main__":
-    main()
