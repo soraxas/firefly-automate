@@ -5,9 +5,13 @@ import pickle
 from typing import Dict, List, Set
 import argparse, argcomplete
 
-import pandas as pd
 import pytz
 import tqdm
+
+import numpy as np
+
+from dataclasses import dataclass
+import pandas as pd
 from datetime import datetime
 from dateutil.parser import parse as dateutil_parser
 from dateutil.relativedelta import relativedelta
@@ -25,6 +29,12 @@ from firefly_automate.miscs import (
     prompt_response,
     setup_logger,
 )
+
+from firefly_automate.firefly_request_manager import (
+    update_rule_action,
+    get_merge_as_transfer_rule_id,
+)
+
 
 LOGGER = logging.getLogger()
 
@@ -112,6 +122,87 @@ parser.add_argument(
 argcomplete.autocomplete(parser)
 
 
+@dataclass
+class MergingRequest:
+    info_df: pd.DataFrame
+    destination_acc_name: str
+    withdrawl_to_transfer_update: PendingUpdates
+    deposit_transaction_to_delete: str
+
+
+MAX_DAYS_DIFF = 1
+MAX_DAYS_DIFF = 3
+MAX_AMOUNT_DIFF = 1e-4
+BATCH_SIZE = 5
+
+
+def process_in_batch(pending_updates: List[MergingRequest]):
+    if len(pending_updates) == 0:
+        return
+
+    print("========================")
+    print()
+    print("========================")
+
+    def print_pending_updates(pending_updates):
+        for i, pending_update in enumerate(pending_updates):
+            print("<" + ("-" * 18) + f" {i+1} " + ("-" * 18) + ">")
+            print_df(pending_update.info_df)
+            print(f"=" * (20 * 2 + 3))
+
+    print_pending_updates(pending_updates)
+    while True:
+        print(
+            ">> IMPORTANT: Review the above output and see if the updates are ok. Or enter space-separated number to ignore:"
+        )
+        inputs = input(f">> [1-{len(pending_updates)}/y/N] ")
+        inputs = inputs.strip()
+        if inputs in ("n", "N", ""):
+            break
+        if inputs.lower() == "y":
+            for updates in tqdm.tqdm(pending_updates, desc="Applying updates"):
+                update_rule_action(
+                    id=get_merge_as_transfer_rule_id(),
+                    action_packs=[
+                        (
+                            "convert_transfer",
+                            updates.destination_acc_name,
+                        ),
+                        (
+                            "remove_tag",
+                            "AUTOMATE_convert-as-transfer",
+                        ),
+                    ],
+                )
+                updates.withdrawl_to_transfer_update.apply(dry_run=False)
+
+                send_transaction_delete(updates.deposit_transaction_to_delete)
+            break
+        else:
+            try:
+                nums = [int(num.strip()) - 1 for num in inputs.split(" ")]
+            except ValueError:
+                print("Invalid choices")
+                continue
+            nums = list(reversed(sorted(set(nums))))
+            print(nums)
+            if not all(0 <= n < len(pending_updates) for n in nums):
+                print("Number out of range.")
+                continue
+            # remove them from pendings
+            for i in nums:
+                pending_updates.pop(i)
+            if len(pending_updates) == 0:
+                break
+            print_pending_updates(pending_updates)
+
+    pending_deletes.clear()
+
+
+def print_df(df: pd.DataFrame):
+    print(df.fillna("").to_markdown(index=False, floatfmt=".2f"))
+
+
 def main():
     global available_rules
     args = parser.parse_args()
@@ -142,8 +233,6 @@ def main():
         with open(args.cache_file_name, "rb") as f:
             all_transactions = pickle.load(f)
 
-    from icecream import ic
-
     IDS_to_transaction = {t.id: t for t in all_transactions}
 
     df = pd.DataFrame(
@@ -161,44 +250,19 @@ def main():
         ],
         columns=["type", "date", "id", "desc", "amount", "source", "dest"],
     )
-
     df["date"] = pd.to_datetime(df["date"], infer_datetime_format=True)
-
-    import numpy as np
-
-    ic(all_transactions[-2:])
-
-    ic(df)
 
     withdrawal = df[df["type"] == "withdrawal"]
     deposit = df[df["type"] == "deposit"]
-
-    ic(withdrawal)
-    ic(deposit)
-
-    MAX_DAYS_DIFF = 1
-    MAX_DAYS_DIFF = 0
-    MAX_AMOUNT_DIFF = 1e-4
 
     amount_different = np.abs(
         np.asarray(withdrawal["amount"].astype(float))[:, np.newaxis]
         - np.asarray(deposit["amount"].astype(float))
     )
 
-    ic(amount_different)
+    DELETED_ID = set()
 
-    out = np.asarray(withdrawal["date"])[:, None] - np.asarray(deposit["date"])
-    # days_different = np.abs(np.vectorize(lambda x: x.days)(out))
-
-    print(out.shape)
-    ic(out.dtype)
-
-    from collections import defaultdict
-
-    all_potential_match = dict()
-
-    count = 0
-
+    process_Q = []
     for withdrawal_idx in range(amount_different.shape[0]):
         # potential match based on date being similar
         potential_match_deposit_indices = np.where(
@@ -206,11 +270,11 @@ def main():
         )[0]
 
         if len(potential_match_deposit_indices) > 0:
-            import pytz
 
             withdrawal_date = withdrawal.iloc[withdrawal_idx]["date"].astimezone(
                 tz=pytz.UTC
             )
+
             deposit_dates = deposit.iloc[potential_match_deposit_indices]["date"].apply(
                 lambda x: x.astimezone(tz=pytz.UTC)
             )
@@ -222,127 +286,80 @@ def main():
                 withdrawal_deposit_pair_diff <= MAX_DAYS_DIFF
             ]
 
-            # ic(potential_match_by_date)
+            # remove matches that are fom the same account
+            potential_match_by_date = potential_match_by_date[
+                potential_match_by_date.dest != withdrawal.iloc[withdrawal_idx].source
+            ]
+
+            # remove any matches that had already been deleted
+            potential_match_by_date = potential_match_by_date[
+                ~potential_match_by_date.id.isin(DELETED_ID)
+            ]
+
             if len(potential_match_by_date) > 0:
-                out = np.asarray(withdrawal["date"])[:, None] - np.asarray(
-                    deposit["date"]
-                )
-                days_different = np.abs(np.vectorize(lambda x: x.days)(out))
-
-                all_potential_match[withdrawal_idx] = potential_match_deposit_indices
-                # ic(withdrawal_idx, potential_match_deposit_indices)
-                #
-                # ic(withdrawal.iloc[withdrawal_idx]['date'])
-                # ic(deposit.iloc[potential_match_by_date])
-
-                print("===============================")
-                print(withdrawal.iloc[withdrawal_idx].to_frame().T.to_markdown())
-                print(potential_match_by_date.to_markdown())
-
-                print(potential_match_by_date.iloc[0].dest)
 
                 canidate_transfer_from = withdrawal.iloc[withdrawal_idx]
+
+                if len(potential_match_by_date) > 1:
+                    info_row = [np.nan] * (len(withdrawal.columns) - 1)
+                    info_row[1] = "---Select followings---"
+                    info_df = pd.DataFrame(
+                        [
+                            withdrawal.iloc[withdrawal_idx].values.tolist(),
+                            info_row,
+                            *potential_match_by_date.values.tolist(),
+                        ],
+                        columns=withdrawal.columns,
+                    )
+                    info_df["amount"] = pd.to_numeric(info_df.amount)
+
+                    print("===============================")
+                    print_df(info_df)
+                    while True:
+                        _id = input(
+                            f"> which transaction ID do you want to merge? {potential_match_by_date.id.tolist()} "
+                        )
+                        _potential_match_by_date = potential_match_by_date[
+                            potential_match_by_date.id == _id
+                        ]
+                        if len(_potential_match_by_date) == 1:
+                            potential_match_by_date = _potential_match_by_date
+                            break
+                        print(f"Invalid selection, not was matched.")
+
+                info_df = pd.DataFrame(
+                    [
+                        withdrawal.iloc[withdrawal_idx].values.tolist(),
+                        *potential_match_by_date.values.tolist(),
+                    ],
+                    columns=withdrawal.columns,
+                )
+
                 canidate_transfer_to = potential_match_by_date.iloc[0]
 
-                from firefly_automate.firefly_request_manager import (
-                    update_rule_action,
-                    get_merge_as_transfer_rule_id,
+                process_Q.append(
+                    MergingRequest(
+                        info_df=info_df,
+                        destination_acc_name=canidate_transfer_to.dest,
+                        withdrawl_to_transfer_update=PendingUpdates(
+                            IDS_to_transaction[canidate_transfer_from.id],
+                            "merging",
+                            apply_rule=True,
+                            updates_kwargs=dict(
+                                description=f"[{canidate_transfer_from.desc}] > [{canidate_transfer_to.desc}]",
+                                tags=["AUTOMATE_convert-as-transfer"],
+                            ),
+                        ),
+                        deposit_transaction_to_delete=canidate_transfer_to.id,
+                    )
                 )
 
-                update_rule_action(
-                    id=get_merge_as_transfer_rule_id(),
-                    action_packs=[
-                        (
-                            "convert_transfer",
-                            canidate_transfer_to.dest,
-                        ),
-                        (
-                            "remove_tag",
-                            "AUTOMATE_convert-as-transfer",
-                        ),
-                    ],
-                )
+                if len(process_Q) >= BATCH_SIZE:
+                    process_in_batch(process_Q)
+                    process_Q.clear()
 
-                pending_updates = [
-                    PendingUpdates(
-                        IDS_to_transaction[canidate_transfer_from.id],
-                        "merging",
-                        apply_rule=True,
-                        updates_kwargs=dict(
-                            description=f"[{canidate_transfer_from.desc}] > [{canidate_transfer_to.desc}]",
-                            tags=["AUTOMATE_convert-as-transfer"],
-                        ),
-                    ),
-                    # PendingUpdates(
-                    #     IDS_to_transaction[canidate_transfer_to.id],
-                    #     "merging",
-                    #     updates_kwargs=dict(
-                    #         tags=["AUTOMATE_delete"]
-                    #     ),
-                    # ),
-                ]
-
-                print("========================")
-                for pending_update in pending_updates:
-                    print(pending_update)
-
-                if prompt_response(
-                    ">> IMPORTANT: Review the above output and see if the updates are ok:"
-                ):
-
-                    for updates in tqdm.tqdm(pending_updates, desc="Applying updates"):
-                        updates.apply(dry_run=False)
-
-                    send_transaction_delete(canidate_transfer_to.id)
-
-                # print()
-                # exit()
-
-                # count += 1
-                # if count > 20:
-                #     exit()
-
-    ic(all_potential_match)
-    # print(withdrawal['date'] - deposit['date'])
-
-    exit()
-
-    for rule in available_rules:
-        rule.set_all_transactions(all_transactions)
-        rule.set_rule_config(args.rule_config)
-    # TODO: make this parallel if num of transactions is huge
-    for data in all_transactions:
-        process_one_transaction(data)
-
-    print("========================")
-
-    if len(pending_updates) == 0 and len(pending_deletes) == 0:
-        print("No update necessary.")
-        exit()
-
-    elif len(pending_updates) > 0:
-        for acc, updates_in_one_acc in group_by(
-            pending_updates.values(), lambda x: x.acc
-        ).items():
-            print(f"{acc}:")
-            grouped_rule_updates = group_by(updates_in_one_acc, lambda x: x.rule)
-            for rule_name, updates_in_one_rule in grouped_rule_updates.items():
-                print(f" >> rule: {rule_name} <<")
-                for updates in sorted(updates_in_one_rule, key=lambda x: x.date):
-                    print(updates)
-
-        print("=========================")
-        if args.yes or prompt_response(
-            ">> IMPORTANT: Review the above output and see if the updates are ok:"
-        ):
-
-            for updates in tqdm.tqdm(pending_updates.values(), desc="Applying updates"):
-                updates.apply(dry_run=False)
-
-    elif len(pending_deletes) > 0:
-        if args.yes or prompt_response(">> Ready to perform the delete?"):
-            for deletes_id in tqdm.tqdm(pending_deletes, desc="Applying deletes"):
-                send_transaction_delete(int(deletes_id))
+                DELETED_ID.add(canidate_transfer_to.id)
+    process_in_batch(process_Q)
 
 
 if __name__ == "__main__":
