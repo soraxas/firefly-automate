@@ -294,7 +294,11 @@ def search_keywords_in_text(
 def prompt_response(msg: str):
     abort = True
     try:
-        user_input = input(f"{msg} [yN] ")
+        try:
+            user_input = input(f"{msg} [y/N/QUIT] ")
+        except KeyboardInterrupt:
+            print("Aborting...")
+            exit(1)
         abort = user_input.strip().lower() != "y"
     except KeyboardInterrupt:
         print()
