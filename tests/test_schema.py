@@ -7,7 +7,6 @@
 #
 # # Validate data against the schema. Throws a ValueError if data is invalid.
 # yamale.validate(schema, data)
-from typing import Any
 
 gist = """{"description": "the description for this gist",
            "public": true,
@@ -17,13 +16,10 @@ gist = """{"description": "the description for this gist",
 
 gist = open("./config.yaml", "r").read()
 
+
 import schema
-from schema import Schema, And, Use, Optional, Or
-
-import json
-
 import yaml
-
+from schema import And, Optional, Or, Schema, Use
 
 # gist_schema = Schema(And(Use(json.loads),  # first convert from JSON
 #                           # use str since json returns unicode

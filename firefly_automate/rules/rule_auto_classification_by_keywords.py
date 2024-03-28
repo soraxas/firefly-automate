@@ -1,4 +1,4 @@
-from schema import Schema, Optional, Or
+from schema import Optional, Or, Schema
 
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text

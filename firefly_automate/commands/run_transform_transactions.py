@@ -1,17 +1,13 @@
 #!/bin/env python
-import os
-import logging
-import pickle
-from typing import Dict, List, Set
 import argparse
+import logging
+from typing import Dict, Set
 
 import tqdm
 
 from firefly_automate import rules
 from firefly_automate.config_loader import config
-from firefly_automate.firefly_request_manager import (
-    send_transaction_delete,
-)
+from firefly_automate.firefly_request_manager import send_transaction_delete
 from firefly_automate.miscs import (
     FireflyTransactionDataClass,
     PendingUpdates,
@@ -116,7 +112,6 @@ def run(args: argparse.ArgumentParser):
         if args.yes or prompt_response(
             ">> IMPORTANT: Review the above output and see if the updates are ok:"
         ):
-
             for updates in tqdm.tqdm(pending_updates.values(), desc="Applying updates"):
                 updates.apply(dry_run=False)
 

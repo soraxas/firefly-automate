@@ -1,7 +1,7 @@
 import dataclasses
 import datetime
 from dataclasses import dataclass
-from typing import Optional, Dict, List
+from typing import Dict, List
 
 
 @dataclass(init=False)

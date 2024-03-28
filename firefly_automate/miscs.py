@@ -1,29 +1,28 @@
 import logging
-from dataclasses import dataclass
 import pprint
 import re
+from dataclasses import dataclass
 from typing import (
-    Optional,
-    Dict,
-    List,
     Callable,
+    Dict,
+    Iterable,
+    List,
+    Match,
+    Optional,
+    Tuple,
     TypeVar,
     Union,
-    Iterable,
-    Match,
-    AnyStr,
-    Tuple,
 )
 
 import humanize
 from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
-from firefly_automate.config_loader import config, JsonSerializableNonNesting
+from firefly_automate.config_loader import JsonSerializableNonNesting, config
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.firefly_request_manager import (
-    send_transaction_update,
     get_firefly_account_mappings,
+    send_transaction_update,
 )
 
 TransactionUpdateValueType = Union[str, List[str]]
@@ -302,7 +301,6 @@ def prompt_response(msg: str):
         abort = user_input.strip().lower() != "y"
     except KeyboardInterrupt:
         print()
-        pass
     # if abort:
     #     print("Aborting...")
     #     exit(1)

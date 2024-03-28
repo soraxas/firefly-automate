@@ -1,8 +1,8 @@
-from typing import List, Union, Dict
-
 import os
+from typing import Dict, List, Union
+
 import yaml
-from schema import Schema, Optional
+from schema import Optional, Schema
 
 YamlItemType = Union[Dict[str, object], List[object], str, int, None]
 JsonSerializableNonNesting = Union[str, int, List[str], List[int]]

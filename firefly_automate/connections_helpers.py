@@ -1,4 +1,4 @@
-from typing import Any, Dict, Iterator, Callable
+from typing import Any, Callable, Dict, Iterator
 
 import tqdm
 

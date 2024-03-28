@@ -4,8 +4,8 @@ import sys
 from typing import Any, Iterable, List
 
 import firefly_iii_client
-import pandas as pd
 import numpy as np
+import pandas as pd
 import tqdm
 from firefly_iii_client.api import accounts_api
 from firefly_iii_client.model.transaction_split_store import TransactionSplitStore

@@ -1,5 +1,3 @@
-import dataclasses
-
 from schema import Schema
 
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
@@ -27,7 +25,6 @@ class DeleteNonReconciled(Rule):
             return
 
         if not entry.reconciled:
-
             print(f"==========================")
             print(f"   desc: {entry.description}")
             print(f"   From: {entry.source_name}")

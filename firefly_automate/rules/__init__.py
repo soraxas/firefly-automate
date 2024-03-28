@@ -1,5 +1,5 @@
 import glob
-from os.path import dirname, basename, isfile, join
+from os.path import basename, dirname, isfile, join
 
 # import all module in current folder.
 modules = glob.glob(join(dirname(__file__), "*.py"))

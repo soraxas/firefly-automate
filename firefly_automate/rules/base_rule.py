@@ -8,8 +8,8 @@ from schema import Schema
 from firefly_automate.config_loader import config
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 from firefly_automate.miscs import (
-    PendingUpdates,
     FireflyIIIRulesConflictException,
+    PendingUpdates,
     TransactionUpdateValueType,
 )
 

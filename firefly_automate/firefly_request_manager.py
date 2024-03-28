@@ -5,27 +5,24 @@ from typing import Dict, Iterable, Tuple
 
 import firefly_iii_client
 from firefly_iii_client import Configuration
-from firefly_iii_client.api import accounts_api, transactions_api, rules_api
+from firefly_iii_client.api import accounts_api, rules_api, transactions_api
+from firefly_iii_client.model.rule_action_keyword import RuleActionKeyword
+from firefly_iii_client.model.rule_action_store import RuleActionStore
+from firefly_iii_client.model.rule_action_update import RuleActionUpdate
+from firefly_iii_client.model.rule_store import RuleStore
+from firefly_iii_client.model.rule_trigger_keyword import RuleTriggerKeyword
+from firefly_iii_client.model.rule_trigger_store import RuleTriggerStore
+from firefly_iii_client.model.rule_trigger_type import RuleTriggerType
+from firefly_iii_client.model.rule_update import RuleUpdate
+from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
+from firefly_iii_client.model.transaction_store import TransactionStore
 from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilter
 from firefly_iii_client.model.transaction_update import TransactionUpdate
-from firefly_iii_client.model.transaction_store import TransactionStore
-from firefly_iii_client.model.rule_store import RuleStore
 
-from firefly_iii_client.model.rule_trigger_type import RuleTriggerType
-from firefly_iii_client.model.rule_action_store import RuleActionStore
-from firefly_iii_client.model.rule_action_keyword import RuleActionKeyword
-from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
-
-
-from firefly_iii_client.model.rule_trigger_store import RuleTriggerStore
-from firefly_iii_client.model.rule_trigger_keyword import RuleTriggerKeyword
-from firefly_iii_client.model.rule_update import RuleUpdate
-from firefly_iii_client.model.rule_action_update import RuleActionUpdate
-
-from firefly_automate.config_loader import config, YamlItemType
+from firefly_automate.config_loader import YamlItemType, config
 from firefly_automate.connections_helpers import (
-    extract_data_from_pager,
     FireflyPagerWrapper,
+    extract_data_from_pager,
 )
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 
@@ -192,7 +189,6 @@ def get_firefly_account_mappings() -> Dict[str, str]:
 
 
 def send_transaction_update(transaction_id: int, transaction_update: TransactionUpdate):
-
     def _raw_send(_id, _tran_update):
         return api_instance.update_transaction(str(_id), _tran_update)
 
@@ -202,13 +198,11 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
             api_response = _raw_send(transaction_id, transaction_update)
         except firefly_iii_client.ApiException as e:
             if "This transaction is already reconciled" in e.body:
-
                 from . import miscs
 
                 if miscs.always_override_reconciled or miscs.prompt_response(
                     f"> Transaction {transaction_id} is already reconciled. Override?"
                 ):
-
                     # first remove reconcile
                     api_response = _raw_send(
                         transaction_id,

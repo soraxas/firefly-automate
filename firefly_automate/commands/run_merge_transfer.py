@@ -1,29 +1,20 @@
 #!/bin/env python
-import os
-import logging
-from typing import Dict, List, Set
 import argparse
+import logging
+from dataclasses import dataclass
+from typing import List
 
+import numpy as np
+import pandas as pd
 import pytz
 import tqdm
 
-import numpy as np
-
-from dataclasses import dataclass
-import pandas as pd
-
 from firefly_automate.firefly_request_manager import (
-    send_transaction_delete,
-)
-from firefly_automate.miscs import (
-    PendingUpdates,
-)
-
-from firefly_automate.firefly_request_manager import (
-    update_rule_action,
     get_merge_as_transfer_rule_id,
+    send_transaction_delete,
+    update_rule_action,
 )
-
+from firefly_automate.miscs import PendingUpdates
 
 LOGGER = logging.getLogger()
 
@@ -158,7 +149,6 @@ def run(args: argparse.ArgumentParser):
         )[0]
 
         if len(potential_match_deposit_indices) > 0:
-
             withdrawal_date = withdrawal.iloc[withdrawal_idx]["date"].astimezone(
                 tz=pytz.UTC
             )
@@ -185,7 +175,6 @@ def run(args: argparse.ArgumentParser):
             ]
 
             if len(potential_match_by_date) > 0:
-
                 canidate_transfer_from = withdrawal.iloc[withdrawal_idx]
 
                 if len(potential_match_by_date) > 1:

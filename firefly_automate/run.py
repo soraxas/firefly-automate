@@ -1,13 +1,11 @@
 #!/bin/env python
-import os
+import argparse
 import logging
+import os
 import pickle
-from typing import Dict, List, Set
-import argparse, argcomplete
-
-from . import miscs
-
 from datetime import datetime
+
+import argcomplete
 from dateutil.parser import parse as dateutil_parser
 from dateutil.relativedelta import relativedelta
 
@@ -24,6 +22,8 @@ from firefly_automate.miscs import (
     prompt_response,
     setup_logger,
 )
+
+from . import miscs
 
 LOGGER = logging.getLogger()
 
@@ -119,7 +119,7 @@ def init(args: argparse.ArgumentParser):
     setup_logger(args.debug)
 
 
-from .commands import run_transform_transactions, run_merge_transfer, run_import_csv
+from .commands import run_import_csv, run_merge_transfer, run_transform_transactions
 
 COMMANDS_MODULES = (
     run_transform_transactions,
