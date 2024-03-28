@@ -3,6 +3,9 @@ import argparse
 import sys
 from typing import Any, Iterable, List
 
+import yaml
+from pathlib import Path
+
 import firefly_iii_client
 import numpy as np
 import pandas as pd
@@ -49,7 +52,31 @@ def filter_map_input_to_transaction_store_input(key: str, value: Any):
         return value  # default
 
 
+def string_sep_with_equal_sign(arg):
+    x = arg.split("=")
+    assert len(x) == 2
+    return x
+
+
 command_name = "import_csv"
+
+optional_attributes = [
+    "currency_code",
+    "foreign_amount",
+    "category_name",
+    "currency_code",
+    "source_name",
+    "destination_name",
+    "bill_name",
+    "tags",
+    "notes",
+    "internal_reference",
+    "external_id",
+    "process_date",
+    "due_date",
+    "payment_date",
+    "invoice_date",
+]
 
 
 def select_option(options, query: str = ""):
@@ -99,14 +126,6 @@ def init_subparser(parser):
         type=str,
     )
     parser.add_argument(
-        "-f",
-        "--as-float",
-        help="columns to interpret as float",
-        default=[],
-        nargs="+",
-        type=str,
-    )
-    parser.add_argument(
         "-i",
         "--no-interpret-int-as-column",
         help="interpret integer as column index",
@@ -124,36 +143,78 @@ def init_subparser(parser):
         help="destination account name",
         type=str,
     )
+    parser.add_argument(
+        "-f",
+        "--filter-by-col",
+        help="filter column with string",
+        default=[],
+        nargs="+",
+        type=string_sep_with_equal_sign,
+    )
+    parser.add_argument(
+        "-nn",
+        "--non-null-by-col",
+        help="filter column with non-null value",
+        default=[],
+        nargs="+",
+        type=str,
+    )
+    parser.add_argument(
+        "--load-mappings",
+        help="load mappings from file",
+        default=None,
+        type=str,
+    )
     parser.set_defaults(parser=parser)
 
 
-def run(args: argparse.ArgumentParser):
-    if not sys.stdin.isatty() and args.file_input is None:
-        # read frome stdin
-        args.file_input = sys.stdin
-    elif sys.stdin.isatty() and args.file_input is None:
-        print(args)
-        args.parser.print_usage()
-        print(f"{args.parser.prog}: there was no stdin and no csv file given.")
-        exit(1)
-    df = pd.read_csv(args.file_input, skiprows=args.skip_rows)
+def ask_for_account_name():
+    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
+        api_instance = accounts_api.AccountsApi(api_client)
 
-    if args.interpret_int_as_column:
-        args.drop = list(transform_col_index_to_name(df, args.drop))
-        args.as_datetime = list(transform_col_index_to_name(df, args.as_datetime))
-        args.as_float = list(transform_col_index_to_name(df, args.as_float))
-
-    if len(args.drop) > 0:
-        df = df.drop(columns=list(args.drop))
-    for col in args.as_datetime:
-        df[col] = pd.to_datetime(
-            df[col],
-            # infer_datetime_format=True,
+        all_accs = group_by(
+            extract_data_from_pager(
+                FireflyPagerWrapper(api_instance.list_account, "accounts")
+            ),
+            functor=lambda x: x["attributes"]["type"],
         )
 
-    for col in args.as_float:
-        df[col] = df[col].apply(filter_clean_dollar_format)
+        with pd.option_context(
+            "display.max_columns",
+            None,
+            "display.max_rows",
+            None,
+            "display.max_colwidth",
+            0,
+            "display.width",
+            0,
+        ):
+            data = []
+            for k, grouped_acc in all_accs.items():
+                if k not in ["revenue", "expense"]:
+                    for _acc in grouped_acc:
+                        data.append([_acc["id"], k, _acc["attributes"]["name"]])
 
+            bank_info_df = pd.DataFrame(
+                data,
+                columns=[
+                    "id",
+                    "type",
+                    "Acc name",
+                ],
+            )
+            print(bank_info_df.to_markdown(index=False))
+
+    bank_id = str(int(input("> what is the id of this bank account? ")))
+
+    bank_names = bank_info_df[bank_info_df.id == bank_id]["Acc name"]
+    if len(bank_names) != 1:
+        print(f"> invalid choice. Result is {bank_names}")
+    bank_name = bank_names.iloc[0]
+    return bank_name
+
+
+def manual_mapping(df):
     new_df_data = {}
     print("==============================")
     print(" The following is your data")
@@ -177,8 +238,8 @@ def run(args: argparse.ArgumentParser):
     if selected == "No":
         raise NotImplementedError("")
     else:
-        transaction_type = pd.Series([np.nan] * len(df))
-        amount = pd.Series([np.nan] * len(df))
+        transaction_type = pd.Series([None] * len(df))
+        amount = pd.Series([None] * len(df))
         selected, remainings = select_option(
             remainings, query="> which one is incoming (i.e. +'ve balance / Credit)?"
         )
@@ -195,7 +256,145 @@ def run(args: argparse.ArgumentParser):
         new_df_data["type"] = transaction_type
         new_df_data["amount"] = amount
 
-    df = pd.DataFrame(new_df_data)
+    return pd.DataFrame(new_df_data)
+
+
+im_source = lambda _d: _d.type == "withdrawal"
+im_destination = lambda _d: _d.type == "deposit"
+
+
+def auto_mapping(df, preset_mappings):
+    new_df_data = pd.DataFrame()
+
+    def _process_special(source, extract_as):
+        if extract_as == "__auto-abs__amount":
+            new_df_data["amount"] = df[source].astype(float).abs().astype(str)
+
+        elif extract_as.startswith("__auto-type:"):
+            # map from the specified keyword into either withdrawal or deposit
+            withdrawal, deposit = extract_as.split(":")[1].split("-")
+
+            _series = pd.Series([None] * len(df), dtype=object)
+            _series[df[source] == withdrawal] = "withdrawal"
+            _series[df[source] == deposit] = "deposit"
+            new_df_data["type"] = _series
+
+        elif extract_as.startswith("__auto-source-destination__"):
+            # assign based on whether this is a source acc or destination acc
+            _attr = extract_as[len("__auto-source-destination__") :]
+            new_df_data.loc[_transactions_as_source, f"source_{_attr}"] = df[source]
+            new_df_data.loc[_transactions_as_destination, f"destination_{_attr}"] = df[
+                source
+            ]
+
+        elif extract_as.startswith("__auto-inv-source-destination__"):
+            # assign based on whether this is a source acc or destination acc
+            _attr = extract_as[len("__auto-inv-source-destination__") :]
+            new_df_data.loc[_transactions_as_destination, f"source_{_attr}"] = df[
+                source
+            ]
+            new_df_data.loc[_transactions_as_source, f"destination_{_attr}"] = df[
+                source
+            ]
+
+        else:
+            return False
+        return True
+
+    # very very first, process the type of transaction
+    for k, v in preset_mappings.items():
+        if v.endswith("type"):
+            _process_special(k, v)
+    _transactions_as_source = im_source(new_df_data)
+    _transactions_as_destination = im_destination(new_df_data)
+
+    # first process all the special ones
+    for k, v in preset_mappings.items():
+        print(k, v)
+        if not _process_special(k, v):  # True == processed
+            # _remaining_mappings[k] = v
+            new_df_data[v] = df[k]
+        if v.endswith("date"):
+            new_df_data[v] = pd.to_datetime(new_df_data[v], infer_datetime_format=True)
+
+    print("==================================")
+    print(" The following is your mapped data")
+    print(df.head())
+    print("---------------------------------")
+    return new_df_data
+
+
+def run(args: argparse.ArgumentParser):
+    if not sys.stdin.isatty() and args.file_input is None:
+        # read frome stdin
+        args.file_input = sys.stdin
+    elif sys.stdin.isatty() and args.file_input is None:
+        args.parser.print_usage()
+        print(f"{args.parser.prog}: there was no stdin and no csv file given.")
+        exit(1)
+    df = pd.read_csv(args.file_input, skiprows=args.skip_rows, dtype=object)
+
+    if args.interpret_int_as_column:
+        args.drop = list(transform_col_index_to_name(df, args.drop))
+        args.as_datetime = list(transform_col_index_to_name(df, args.as_datetime))
+        # args.as_float = list(transform_col_index_to_name(df, args.as_float))
+
+    ############################################################
+    args.column_mappings = None
+
+    if args.load_mappings:
+        mappings = yaml.safe_load(Path(args.load_mappings).read_text())
+
+        args.column_mappings = mappings.pop("column_mappings", None)
+
+        if "filter_by_col" in mappings:
+            args.filter_by_col.extend(
+                string_sep_with_equal_sign(x) for x in mappings.pop("filter_by_col")
+            )
+        if "non_null_by_col" in mappings:
+            args.non_null_by_col.extend(mappings.pop("non_null_by_col"))
+
+        if len(mappings) > 0:
+            print(
+                f">> There are unused mappings in the given '{args.load_mappings}' file.\n"
+                f">> Including keys: {list(mappings.keys())}.\n"
+                f">> Full content: {mappings}.\n"
+            )
+
+    ############################################################
+
+    if len(args.drop) > 0:
+        df = df.drop(columns=list(args.drop))
+    for col, val in args.filter_by_col:
+        df = df[df[col] == val]
+    for col in args.non_null_by_col:
+        df = df[~df[col].isna()]
+    for col in args.as_datetime:
+        df[col] = pd.to_datetime(
+            df[col],
+            # infer_datetime_format=True,
+        )
+
+    print("------------------------------")
+    print(df.head())
+    print("------------------------------")
+
+    # reset index for any filtered values
+    df = df.reset_index()
+
+    if args.column_mappings is None:
+        df = manual_mapping(df)
+    else:
+        df = auto_mapping(df, args.column_mappings)
+
+    bank_name = ask_for_account_name()
+    if args.source_name is None:
+        args.source_name = bank_name
+    if args.destination_name is None:
+        args.destination_name = bank_name
+
+    df.loc[im_destination(df), f"destination_name"] = bank_name
+    df.loc[im_source(df), f"source_name"] = bank_name
 
     with pd.option_context(
         "display.max_columns", None, "display.max_colwidth", 20, "display.width", 0
@@ -223,65 +422,9 @@ def run(args: argparse.ArgumentParser):
 
     # pprint.pprint(get_firefly_account_mappings())
 
-    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
-        api_instance = accounts_api.AccountsApi(api_client)
-
-        all_accs = group_by(
-            extract_data_from_pager(
-                FireflyPagerWrapper(api_instance.list_account, "accounts")
-            ),
-            functor=lambda x: x["attributes"]["type"],
-        )
-
-        with pd.option_context(
-            "display.max_columns",
-            None,
-            "display.max_rows",
-            None,
-            "display.max_colwidth",
-            0,
-            "display.width",
-            0,
-        ):
-            print(df)
-            print(df.info(verbose=True))
-
-            data = []
-            for k, grouped_acc in all_accs.items():
-                if k not in ["revenue", "expense"]:
-                    for _acc in grouped_acc:
-                        data.append([_acc["id"], k, _acc["attributes"]["name"]])
-
-            bank_info_df = pd.DataFrame(
-                data,
-                columns=[
-                    "id",
-                    "type",
-                    "Acc name",
-                ],
-            )
-            print(bank_info_df.to_markdown(index=False))
-
-    bank_id = str(int(input("> what is the id of this bank account? ")))
-
-    bank_names = bank_info_df[bank_info_df.id == bank_id]["Acc name"]
-    if len(bank_names) != 1:
-        print(f"> invalid choice. Result is {bank_names}")
-    bank_name = bank_names.iloc[0]
-    if args.source_name is None:
-        args.source_name = bank_name
-    if args.destination_name is None:
-        args.destination_name = bank_name
-
     new_transactions = []
     for index, row in df.iterrows():
         post_data = dict()
-        if row["type"] == "withdrawal":
-            assert args.source_name
-            post_data["source_name"] = args.source_name
-        if row["type"] == "deposit":
-            assert args.destination_name
-            post_data["destination_name"] = args.destination_name
         post_data.update(
             {
                 k: filter_map_input_to_transaction_store_input(k, v)
@@ -296,6 +439,7 @@ def run(args: argparse.ArgumentParser):
             ],
         )
         print(new_transaction)
+
         new_transactions.append(new_transaction)
 
     # money patch to force capturing input terminal, instead of potential pipe
