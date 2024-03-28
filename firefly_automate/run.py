@@ -88,9 +88,6 @@ parser.add_argument(
 ########################################################
 
 
-args = None
-
-
 def _get_transactions(args: argparse.ArgumentParser):
     if not args.use_cache or not os.path.exists(args.cache_file_name):
         all_transactions = list(get_transactions(args.start, args.end))
@@ -115,7 +112,7 @@ def init(args: argparse.ArgumentParser):
         args.start = args.end - relativedelta(months=args.relative_months)
     elif args.start is not None and args.end is None:
         args.end = args.start + relativedelta(months=args.relative_months)
-    print(f"From: {args.start} to {args.end}")
+    LOGGER.debug("From: {} to {}", args.start, args.end)
     ####################################
     miscs.always_override_reconciled = args.always_override_reconciled
 
@@ -130,16 +127,12 @@ COMMANDS_MODULES = (
     run_import_csv,
 )
 
+args = None
 parser.set_defaults(get_transactions=lambda: _get_transactions(args))
 
-
 subparser = parser.add_subparsers(dest="command")
-
 for _subcommand_module in COMMANDS_MODULES:
     _sub_parser = subparser.add_parser(_subcommand_module.command_name)
-    _sub_parser.add_argument(
-        _subcommand_module.command_name, type=str, nargs="*", default=None
-    )
     _subcommand_module.init_subparser(_sub_parser)
 
 
@@ -158,7 +151,8 @@ def main():
             _module.run(args)
             break
     else:
-        raise NotImplementedError(args.commmand)
+        parser.print_usage()
+        exit(1)
 
 
 if __name__ == "__main__":

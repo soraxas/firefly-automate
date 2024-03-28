@@ -44,6 +44,13 @@ class RemoveDuplicates(Rule):
             # do not remove both the master and slave transactions
             return
 
+        if (
+            entry.source_name != "Westpac Choice"
+            and entry.destination_name != "Westpac Choice"
+        ):
+            return
+        print(entry.source_name)
+
         if self.df_transactions is None:
             import pandas as pd
 
@@ -51,7 +58,14 @@ class RemoveDuplicates(Rule):
                 map(lambda x: dataclasses.asdict(x), self.transactions)
             )
         potential_duplicates = self.df_transactions[
-            self.df_transactions.description.str.startswith(entry.description)
+            (
+                self.df_transactions.description.str.upper().str.startswith(
+                    entry.description.upper()
+                )
+                | self.df_transactions.description.str.upper().str.endswith(
+                    entry.description.upper()
+                )
+            )
             & (self.df_transactions.date == entry.date)
             & (
                 (self.df_transactions.source_name == entry.source_name)
