@@ -9,21 +9,12 @@ import argcomplete
 from dateutil.parser import parse as dateutil_parser
 from dateutil.relativedelta import relativedelta
 
-from firefly_automate import rules
 from firefly_automate.config_loader import config
-from firefly_automate.firefly_request_manager import (
-    get_transactions,
-    send_transaction_delete,
-)
-from firefly_automate.miscs import (
-    FireflyTransactionDataClass,
-    PendingUpdates,
-    group_by,
-    prompt_response,
-    setup_logger,
-)
+from firefly_automate.firefly_request_manager import get_transactions
+from firefly_automate.miscs import setup_logger
 
 from . import miscs
+from .commands import run_import_csv, run_merge_transfer, run_transform_transactions
 
 LOGGER = logging.getLogger()
 
@@ -68,10 +59,9 @@ parser.add_argument(
     "-m",
     "--relative-months",
     default=3,
-    action="store_true",
+    type=int,
     help="If `start` or `end` is not given, a relative time of this many months will be used.",
 )
-
 parser.add_argument(
     "--debug",
     default=False,
@@ -118,8 +108,6 @@ def init(args: argparse.ArgumentParser):
 
     setup_logger(args.debug)
 
-
-from .commands import run_import_csv, run_merge_transfer, run_transform_transactions
 
 COMMANDS_MODULES = (
     run_transform_transactions,
