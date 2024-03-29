@@ -27,16 +27,35 @@ class MergingRequest:
     deposit_transaction_to_delete: str
 
 
-MAX_DAYS_DIFF = 1
-MAX_DAYS_DIFF = 3
-MAX_AMOUNT_DIFF = 1e-4
-BATCH_SIZE = 5
-
 command_name = "merge"
 
 
 def init_subparser(parser):
-    pass
+    parser.add_argument(
+        "-d",
+        "--max-days-differences",
+        help=(
+            "The maximum days differences between 2 transactions that have same $ amount "
+            "to classify them as an transfer between personal accounts."
+        ),
+        default=0,
+        type=int,
+    )
+    parser.add_argument(
+        "--max-amount-differences",
+        help=(
+            "The maximum amount differences between 2 transactions "
+            "to classify them as an transfer between personal accounts."
+        ),
+        default=1e-4,
+        type=float,
+    )
+    parser.add_argument(
+        "--batch-size",
+        help="The batch size to confirm the pending transfer merges from user.",
+        default=5,
+        type=int,
+    )
 
 
 def process_in_batch(pending_updates: List[MergingRequest]):
@@ -145,7 +164,7 @@ def run(args: argparse.ArgumentParser):
     for withdrawal_idx in range(amount_different.shape[0]):
         # potential match based on date being similar
         potential_match_deposit_indices = np.where(
-            amount_different[withdrawal_idx, :] <= MAX_AMOUNT_DIFF
+            amount_different[withdrawal_idx, :] <= args.max_amount_differences
         )[0]
 
         if len(potential_match_deposit_indices) > 0:
@@ -161,7 +180,7 @@ def run(args: argparse.ArgumentParser):
                 withdrawal_date - deposit_dates
             ).apply(lambda x: x.days)
             potential_match_by_date = deposit.iloc[potential_match_deposit_indices][
-                withdrawal_deposit_pair_diff <= MAX_DAYS_DIFF
+                withdrawal_deposit_pair_diff <= args.max_days_differences
             ]
 
             # remove matches that are fom the same account
@@ -231,7 +250,7 @@ def run(args: argparse.ArgumentParser):
                     )
                 )
 
-                if len(process_Q) >= BATCH_SIZE:
+                if len(process_Q) >= args.batch_size:
                     process_in_batch(process_Q)
                     process_Q.clear()
 
