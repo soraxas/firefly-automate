@@ -1,15 +1,14 @@
 #!/bin/env python
 import argparse
 import sys
-from typing import Any, Iterable, List
-
-import yaml
 from pathlib import Path
+from typing import Any, Iterable, List
 
 import firefly_iii_client
 import numpy as np
 import pandas as pd
 import tqdm
+import yaml
 from firefly_iii_client.api import accounts_api
 from firefly_iii_client.model.transaction_split_store import TransactionSplitStore
 from firefly_iii_client.model.transaction_store import TransactionStore
