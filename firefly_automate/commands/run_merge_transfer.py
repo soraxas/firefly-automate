@@ -147,6 +147,7 @@ def run(args: argparse.ArgumentParser):
     )
     df["date"] = pd.to_datetime(
         df["date"],
+        utc=True,
         # infer_datetime_format=True,
     )
 
