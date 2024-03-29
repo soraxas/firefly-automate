@@ -20,10 +20,7 @@ from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilt
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
 from firefly_automate.config_loader import YamlItemType, config
-from firefly_automate.connections_helpers import (
-    FireflyPagerWrapper,
-    extract_data_from_pager,
-)
+from firefly_automate.connections_helpers import FireflyPagerWrapper
 from firefly_automate.firefly_datatype import FireflyTransactionDataClass
 
 LOGGER = logging.getLogger(__name__)
@@ -54,12 +51,10 @@ def get_rules() -> Iterable[FireflyTransactionDataClass]:
         # TransactionTypeFilter
         # Optional filter on the transaction type(s) returned. (optional)
 
-        for rule in extract_data_from_pager(
-            FireflyPagerWrapper(
-                api_instance.list_rule,
-                "rules",
-            )
-        ):
+        for rule in FireflyPagerWrapper(
+            api_instance.list_rule,
+            "rules",
+        ).data_entries():
             yield rule
 
 
@@ -70,12 +65,10 @@ def fire_rules():
         # TransactionTypeFilter
         # Optional filter on the transaction type(s) returned. (optional)
 
-        for rule in extract_data_from_pager(
-            FireflyPagerWrapper(
-                api_instance.list_rule,
-                "rules",
-            )
-        ):
+        for rule in FireflyPagerWrapper(
+            api_instance.list_rule,
+            "rules",
+        ).data_entries():
             yield rule
 
 
@@ -167,9 +160,7 @@ def get_merge_as_transfer_rule_id():
 
 #     acc_id_to_name = {
 #         acc["id"]: acc["attributes"]["name"]
-#         for acc in extract_data_from_pager(
-#             FireflyPagerWrapper(api_instance.list_account, "accounts")
-#         )
+#         for acc in FireflyPagerWrapper(api_instance.list_account, "accounts").data_entries()
 #     }
 
 
@@ -181,9 +172,9 @@ def get_firefly_account_mappings() -> Dict[str, str]:
 
         acc_id_to_name = {
             acc["id"]: acc["attributes"]["name"]
-            for acc in extract_data_from_pager(
-                FireflyPagerWrapper(api_instance.list_account, "accounts")
-            )
+            for acc in FireflyPagerWrapper(
+                api_instance.list_account, "accounts"
+            ).data_entries()
         }
         return acc_id_to_name
 
@@ -262,15 +253,13 @@ def get_transactions(
         # Optional filter on the transaction type(s) returned. (optional)
         trans_type = TransactionTypeFilter("all")
 
-        for transaction in extract_data_from_pager(
-            FireflyPagerWrapper(
-                api_instance.list_transaction,
-                "transactions",
-                start=start,
-                end=end,
-                type=trans_type,
-            )
-        ):
+        for transaction in FireflyPagerWrapper(
+            api_instance.list_transaction,
+            "transactions",
+            start=start,
+            end=end,
+            type=trans_type,
+        ).data_entries():
             transaction = transaction
             assert len(transaction["attributes"]["transactions"]) == 1
 

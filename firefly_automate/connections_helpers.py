@@ -74,14 +74,11 @@ class FireflyPagerWrapper:
         self.pbar.update(ret["meta"]["pagination"]["count"])
         return ret
 
-
-def extract_data_from_pager(
-    pager_wrapper: FireflyPagerWrapper,
-) -> Iterator[Dict[str, Any]]:
-    """This is a simple wrapper that iterate through each entry in the 'data' entry
-    for all pages. This wraps nicely with the FireflyPagerWrapper
-    """
-    for page in pager_wrapper:
-        for d in page["data"]:
-            yield d
-            # yield d.to_dict()
+    def data_entries(self) -> Iterator[Dict[str, Any]]:
+        """This is a simple wrapper that iterate through each entry in the 'data' entry
+        for all pages. This wraps nicely with the FireflyPagerWrapper
+        """
+        for page in self:
+            for d in page["data"]:
+                yield d
+                # yield d.to_dict()

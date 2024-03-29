@@ -14,10 +14,7 @@ from firefly_iii_client.model.transaction_split_store import TransactionSplitSto
 from firefly_iii_client.model.transaction_store import TransactionStore
 from firefly_iii_client.model.transaction_type_property import TransactionTypeProperty
 
-from firefly_automate.connections_helpers import (
-    FireflyPagerWrapper,
-    extract_data_from_pager,
-)
+from firefly_automate.connections_helpers import FireflyPagerWrapper
 from firefly_automate.firefly_request_manager import (
     get_firefly_client_conf,
     send_transaction_create,
@@ -172,9 +169,7 @@ def ask_for_account_name():
         api_instance = accounts_api.AccountsApi(api_client)
 
         all_accs = group_by(
-            extract_data_from_pager(
-                FireflyPagerWrapper(api_instance.list_account, "accounts")
-            ),
+            FireflyPagerWrapper(api_instance.list_account, "accounts").data_entries(),
             functor=lambda x: x["attributes"]["type"],
         )
 
