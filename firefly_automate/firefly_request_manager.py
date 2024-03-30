@@ -14,17 +14,16 @@ from firefly_iii_client.model.rule_trigger_keyword import RuleTriggerKeyword
 from firefly_iii_client.model.rule_trigger_store import RuleTriggerStore
 from firefly_iii_client.model.rule_trigger_type import RuleTriggerType
 from firefly_iii_client.model.rule_update import RuleUpdate
+from firefly_iii_client.model.transaction_split_store import TransactionSplitStore
 from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
 from firefly_iii_client.model.transaction_store import TransactionStore
-from firefly_iii_client.model.transaction_split_store import TransactionSplitStore
-
 from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilter
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
+from firefly_automate import miscs
 from firefly_automate.config_loader import config
 from firefly_automate.connections_helpers import FireflyPagerWrapper
 from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
-from firefly_automate import miscs
 
 LOGGER = logging.getLogger(__name__)
 

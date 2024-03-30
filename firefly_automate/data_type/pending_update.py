@@ -1,15 +1,14 @@
 from dataclasses import dataclass
-from typing import Dict, Union, Tuple, List
+from typing import Dict, List, Tuple, Union
 
 import humanize
 from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
+from firefly_automate import miscs
 from firefly_automate.config_loader import JsonSerializableNonNesting, config
 from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 from firefly_automate.firefly_request_manager import send_transaction_update
-
-from firefly_automate import miscs
 
 TransactionOwnerReturnType = Union[str, Tuple[str, str]]
 TransactionUpdateValueType = Union[str, List[str]]

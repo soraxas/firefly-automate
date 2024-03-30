@@ -2,8 +2,8 @@ import dataclasses
 
 from schema import Schema
 
+from firefly_automate import miscs
 from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
-from firefly_automate.miscs import get_transaction_owner
 from firefly_automate.rules.base_rule import Rule
 
 remove_duplicates_schema = Schema(
@@ -49,7 +49,6 @@ class RemoveDuplicates(Rule):
             and entry.destination_name != "Westpac Choice"
         ):
             return
-        print(entry.source_name)
 
         if self.df_transactions is None:
             import pandas as pd
@@ -98,11 +97,11 @@ class RemoveDuplicates(Rule):
             print(f"   type: {entry.type}")
 
             choices = [
-                (entry.id, get_transaction_owner(entry, True), entry.description)
+                (entry.id, miscs.get_transaction_owner(entry, True), entry.description)
             ]
             for idx, row in potential_duplicates.iterrows():
                 choices.append(
-                    (row.id, get_transaction_owner(row, True), row.description)
+                    (row.id, miscs.get_transaction_owner(row, True), row.description)
                 )
 
             choices = sorted(choices, key=lambda x: int(x[0]))
@@ -110,25 +109,26 @@ class RemoveDuplicates(Rule):
             if not show_owner:
                 print(f"    acc: {choices[0][1]}")
 
-            for i, (id, owner, desc) in enumerate(choices):
+            def _printer_formatter(option, idx):
+                id, owner, desc = option
                 owner_info = f"[{owner:>10}] " if show_owner else ""
-                print(f" [{i+1:>1}] {id:>4}: {owner_info}{desc}")
-                # import pprint
-                # pprint.pprint(row)
-            while True:
-                user_input = input(f">> Which one to delete? [1..{len(choices)}/N] ")
-                if user_input.strip() == "":
+                return f" [{idx+1:>1}] {id:>4}: {owner_info}{desc}"
+
+            def input_string_cb(input_string):
+                if input_string.strip() == "":
                     self.ignored_entries.append(choices)
-                    break
-                try:
-                    num = int(user_input)
-                    if not (1 <= num <= len(choices)):
-                        print(f"> Input must be between 1 and {len(choices)}")
-                        continue
-                    self.pending_deletes.add(choices[num - 1][0])
-                    break
-                except ValueError:
-                    print("> Input is not numeric")
+                    return True
+
+            choice, _ = miscs.select_option(
+                options=choices,
+                print_option_functor=lambda x: miscs.print_multiple_options(
+                    x, printer_formatter=_printer_formatter
+                ),
+                query_prompt=">> Which one to delete? [Enter to continue]",
+                input_string_callback=input_string_cb,
+            )
+            if choice:
+                self.pending_deletes.add(choice[0])
 
             for c in choices:
                 self.delete_master_id.add(c[0])

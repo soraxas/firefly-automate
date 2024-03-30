@@ -2,6 +2,8 @@ import logging
 import pprint
 import re
 from typing import (
+    TYPE_CHECKING,
+    Any,
     Callable,
     Dict,
     Iterable,
@@ -13,8 +15,6 @@ from typing import (
 )
 
 from firefly_automate import firefly_request_manager
-
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from firefly_automate.data_type.pending_update import TransactionOwnerReturnType
@@ -147,3 +147,96 @@ def setup_logger(debug: bool = False):
 
     # add ch to logger
     logger.addHandler(ch)
+
+
+def select_option(
+    options: List[Any],
+    query_prompt: str = "",
+    print_option_functor: Callable = None,
+    *,
+    input_string_callback: Optional[Callable[[Any], bool]] = None,
+):
+    """
+    Select the one of the option based on given input.
+    """
+    try:
+        while True:
+            if print_option_functor:
+                print_option_functor(options)
+
+            print(query_prompt)
+            # for i, o in enumerate(options):
+            #     print(f" [{i+1}] {o}")
+            choice = input(f"Select [1-{len(options)}]: ")
+            if input_string_callback:
+                if input_string_callback(choice):
+                    # break by user.
+                    break
+
+            print()
+            try:
+                choice = int(choice) - 1
+            except ValueError:
+                print("[ERROR] Invalid string.\n")
+                continue
+            if choice < 0 or choice >= len(options):
+                print("[ERROR] Choice is out of range.\n")
+                continue
+            options = list(options)
+            selected = options.pop(choice)
+            return selected, options
+        return None, options
+    except KeyboardInterrupt:
+        print("\n> Aborting...")
+        exit()
+
+
+def print_multiple_options(
+    options: List[Any],
+    printer_formatter: Callable[[T, int], str] = None,
+) -> None:
+    """
+    Given multiple choices, print all options available.
+    """
+
+    def default_printer_formatter(option: Any, idx: int) -> str:
+        return f" [{idx + 1:>1}] {option}"
+
+    if printer_formatter is None:
+        printer_formatter = default_printer_formatter
+    for i, option in enumerate(options):
+        print(printer_formatter(option=option, idx=i))
+
+
+class Inequality:
+    @staticmethod
+    def parse(string: str):
+        """
+        Given string must be of the format like:
+            `string1<=string2`
+            `01-12-2020>25July2025`
+        """
+        results = re.split(r"(==|<=|>=|[=<>])", string)
+        if len(results) != 3:
+            raise ValueError("Given input is invalid, unable to parse 3 parts.")
+        if results[1] not in ("<=", ">=", "=", "==", "<", ">"):
+            raise ValueError("Given input is invalid, incorrect inequality sign.")
+        return results
+
+    @staticmethod
+    def compare(
+        value1: Any,
+        inequality_sign: str,
+        value2: Any,
+    ):
+        if inequality_sign == "<=":
+            return value1 <= value2
+        elif inequality_sign == ">=":
+            return value1 >= value2
+        elif inequality_sign == "<":
+            return value1 < value2
+        elif inequality_sign == ">":
+            return value1 > value2
+        elif inequality_sign in ("=", "=="):
+            return value1 == value2
+        raise ValueError("Inequality_sign is not valid")

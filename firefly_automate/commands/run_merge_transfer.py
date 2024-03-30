@@ -9,12 +9,12 @@ import pandas as pd
 import pytz
 import tqdm
 
+from firefly_automate.data_type.pending_update import PendingUpdates
 from firefly_automate.firefly_request_manager import (
     get_merge_as_transfer_rule_id,
     send_transaction_delete,
     update_rule_action,
 )
-from firefly_automate.data_type.pending_update import PendingUpdates
 
 LOGGER = logging.getLogger()
 
