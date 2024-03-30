@@ -201,7 +201,6 @@ class PendingUpdates:
                     if existing_rank < new_rank:
                         # remove the new update as it has lower priority
                         ret.pop(key)
-
         return ret
 
     @property

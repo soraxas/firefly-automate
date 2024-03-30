@@ -12,19 +12,21 @@ from typing import (
     Union,
 )
 
-from firefly_automate.data_type.pending_update import TransactionOwnerReturnType
-from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
-from firefly_automate.firefly_request_manager import (
-    get_firefly_account_mappings,
-)
+from firefly_automate import firefly_request_manager
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from firefly_automate.data_type.pending_update import TransactionOwnerReturnType
+    from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 
 
 def get_transaction_owner(
-    entry: FireflyTransactionDataClass,
+    entry: "FireflyTransactionDataClass",
     actual_name: bool = False,
-) -> TransactionOwnerReturnType:
-    belongs_to: TransactionOwnerReturnType
-    acc_id_to_name = get_firefly_account_mappings()
+) -> "TransactionOwnerReturnType":
+    belongs_to: "TransactionOwnerReturnType"
+    acc_id_to_name = firefly_request_manager.get_firefly_account_mappings()
     if entry.type == "withdrawal":
         belongs_to = entry.source_id
     elif entry.type == "deposit":

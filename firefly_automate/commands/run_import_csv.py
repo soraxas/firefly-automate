@@ -4,22 +4,17 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, List
 
-import firefly_iii_client
-import numpy as np
+import re
 import pandas as pd
 import tqdm
 import yaml
-from firefly_iii_client.api import accounts_api
-from firefly_iii_client.model.transaction_split_store import TransactionSplitStore
-from firefly_iii_client.model.transaction_store import TransactionStore
-from firefly_iii_client.model.transaction_type_property import TransactionTypeProperty
 
-from firefly_automate.connections_helpers import FireflyPagerWrapper
+
 from firefly_automate.firefly_request_manager import (
-    get_firefly_client_conf,
-    send_transaction_create,
+    create_transaction_store,
+    send_transaction_store,
+    get_firefly_account_grouped_by_type,
 )
-from firefly_automate.miscs import group_by
 
 
 def transform_col_index_to_name(df: pd.DataFrame, columns: List[str]) -> Iterable[str]:
@@ -418,26 +413,18 @@ def run(args: argparse.ArgumentParser):
 
     new_transactions = []
     for index, row in df.iterrows():
-        post_data = dict()
-        post_data.update(
-            {
+        new_transaction = create_transaction_store(
+            transaction_data={
                 k: filter_map_input_to_transaction_store_input(k, v)
                 for k, v in row.to_dict().items()
-            }
-        )
-
-        new_transaction = TransactionStore(
+            },
             apply_rules=True,
-            transactions=[
-                TransactionSplitStore(**post_data),
-            ],
         )
         print(new_transaction)
-
         new_transactions.append(new_transaction)
 
     # money patch to force capturing input terminal, instead of potential pipe
     sys.stdin = open("/dev/tty")
     if input("Looks Good?: [y/N] ").lower() == "y":
         for new_transaction in tqdm.tqdm(new_transactions):
-            send_transaction_create(new_transaction)
+            send_transaction_store(new_transaction)

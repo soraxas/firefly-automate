@@ -16,12 +16,15 @@ from firefly_iii_client.model.rule_trigger_type import RuleTriggerType
 from firefly_iii_client.model.rule_update import RuleUpdate
 from firefly_iii_client.model.transaction_split_update import TransactionSplitUpdate
 from firefly_iii_client.model.transaction_store import TransactionStore
+from firefly_iii_client.model.transaction_split_store import TransactionSplitStore
+
 from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilter
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
 from firefly_automate.config_loader import config
 from firefly_automate.connections_helpers import FireflyPagerWrapper
 from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
+from firefly_automate import miscs
 
 LOGGER = logging.getLogger(__name__)
 
@@ -164,19 +167,26 @@ def get_merge_as_transfer_rule_id():
 #     }
 
 
+def get_all_account_entries():
+    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
+        api_instance = accounts_api.AccountsApi(api_client)
+        return FireflyPagerWrapper(api_instance.list_account, "accounts").data_entries()
+
+
 @functools.lru_cache
 def get_firefly_account_mappings() -> Dict[str, str]:
     """Only retrieve once, and then cache it"""
-    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
-        api_instance = accounts_api.AccountsApi(api_client)
+    acc_id_to_name = {
+        acc["id"]: acc["attributes"]["name"] for acc in get_all_account_entries()
+    }
+    return acc_id_to_name
 
-        acc_id_to_name = {
-            acc["id"]: acc["attributes"]["name"]
-            for acc in FireflyPagerWrapper(
-                api_instance.list_account, "accounts"
-            ).data_entries()
-        }
-        return acc_id_to_name
+
+def get_firefly_account_grouped_by_type():
+    return miscs.group_by(
+        get_all_account_entries(),
+        functor=lambda x: x["attributes"]["type"],
+    )
 
 
 def send_transaction_update(transaction_id: int, transaction_update: TransactionUpdate):
@@ -189,8 +199,6 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
             api_response = _raw_send(transaction_id, transaction_update)
         except firefly_iii_client.ApiException as e:
             if "This transaction is already reconciled" in e.body:
-                from . import miscs
-
                 if miscs.always_override_reconciled or miscs.prompt_response(
                     f"> Transaction {transaction_id} is already reconciled. Override?"
                 ):
@@ -208,6 +216,7 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
                     # re-send request.
                     api_response = _raw_send(transaction_id, transaction_update)
 
+                    # send request on setting reconciled as TRUE again
                     api_response = _raw_send(
                         transaction_id,
                         TransactionUpdate(
@@ -219,12 +228,22 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
                     )
             else:
                 raise TransactionUpdateError(
-                    f"Attempting to update transaction {transaction_id}: {transaction_update}"
+                    f"Attempting to update transaction {transaction_id}: "
+                    f"{transaction_update}"
                 ) from e
         return api_response
 
 
-def send_transaction_create(transaction_store: TransactionStore):
+def create_transaction_store(transaction_data: Dict, apply_rules: bool = True):
+    return TransactionStore(
+        apply_rules=apply_rules,
+        transactions=[
+            TransactionSplitStore(**transaction_data),
+        ],
+    )
+
+
+def send_transaction_store(transaction_store: TransactionStore):
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = transactions_api.TransactionsApi(api_client)
         try:

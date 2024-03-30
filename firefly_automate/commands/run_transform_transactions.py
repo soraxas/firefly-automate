@@ -1,15 +1,14 @@
 #!/bin/env python
+import tqdm
 import argparse
 import logging
 from typing import Dict, Set
 
-import tqdm
-
 from firefly_automate import rules
 from firefly_automate.config_loader import config
+from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 from firefly_automate.firefly_request_manager import send_transaction_delete
 from firefly_automate.miscs import (
-    FireflyTransactionDataClass,
     group_by,
     prompt_response,
 )
@@ -62,7 +61,7 @@ def init_subparser(parser):
     )
 
 
-def run(args: argparse.ArgumentParser):
+def run(args: argparse.Namespace):
     global available_rules
 
     if args.list_rules:

@@ -78,22 +78,25 @@ parser.add_argument(
 ########################################################
 
 
-def _get_transactions(args: argparse.ArgumentParser):
-    if not args.use_cache or not os.path.exists(args.cache_file_name):
-        all_transactions = list(get_transactions(args.start, args.end))
+def _get_transactions():
+    global ARGS
+    if not ARGS.use_cache or not os.path.exists(ARGS.cache_file_name):
+        all_transactions = list(get_transactions(ARGS.start, ARGS.end))
 
-        # if args.use_cache:
-        with open(args.cache_file_name, "wb") as f:
+        # if ARGS.use_cache:
+        with open(ARGS.cache_file_name, "wb") as f:
             pickle.dump(all_transactions, f)
     else:
-        with open(args.cache_file_name, "rb") as f:
+        with open(ARGS.cache_file_name, "rb") as f:
             all_transactions = pickle.load(f)
 
     LOGGER.debug(all_transactions)
     return all_transactions
 
 
-def init(args: argparse.ArgumentParser):
+def init(args: argparse.Namespace):
+    global ARGS
+    ARGS = args
     ####################################
     # if all is None, default to most recent 3 months
     if all(x is None for x in (args.start, args.end)):
@@ -115,8 +118,8 @@ COMMANDS_MODULES = (
     run_import_csv,
 )
 
-args = None
-parser.set_defaults(get_transactions=lambda: _get_transactions(args))
+ARGS: argparse.Namespace = None
+parser.set_defaults(get_transactions=_get_transactions)
 
 subparser = parser.add_subparsers(dest="command")
 for _subcommand_module in COMMANDS_MODULES:
@@ -130,7 +133,6 @@ argcomplete.autocomplete(parser)
 
 
 def main():
-    global args
     args = parser.parse_args()
     init(args)
 
