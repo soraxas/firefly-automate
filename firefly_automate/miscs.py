@@ -149,10 +149,27 @@ def setup_logger(debug: bool = False):
     logger.addHandler(ch)
 
 
+def print_multiple_options(
+    options: List[Any],
+    printer_formatter: Callable[[T, int], str] = None,
+) -> None:
+    """
+    Given multiple choices, print all options available.
+    """
+
+    def default_printer_formatter(option: Any, idx: int) -> str:
+        return f" [{idx + 1:>1}] {option}"
+
+    if printer_formatter is None:
+        printer_formatter = default_printer_formatter
+    for i, option in enumerate(options):
+        print(printer_formatter(option=option, idx=i))
+
+
 def select_option(
     options: List[Any],
     query_prompt: str = "",
-    print_option_functor: Callable = None,
+    print_option_functor: Callable = print_multiple_options,
     *,
     input_string_callback: Optional[Callable[[Any], bool]] = None,
 ):
@@ -189,23 +206,6 @@ def select_option(
     except KeyboardInterrupt:
         print("\n> Aborting...")
         exit()
-
-
-def print_multiple_options(
-    options: List[Any],
-    printer_formatter: Callable[[T, int], str] = None,
-) -> None:
-    """
-    Given multiple choices, print all options available.
-    """
-
-    def default_printer_formatter(option: Any, idx: int) -> str:
-        return f" [{idx + 1:>1}] {option}"
-
-    if printer_formatter is None:
-        printer_formatter = default_printer_formatter
-    for i, option in enumerate(options):
-        print(printer_formatter(option=option, idx=i))
 
 
 class Inequality:

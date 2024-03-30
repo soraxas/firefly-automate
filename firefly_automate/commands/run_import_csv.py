@@ -4,17 +4,16 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable, List
 
-import re
 import pandas as pd
 import tqdm
 import yaml
 
-
 from firefly_automate.firefly_request_manager import (
     create_transaction_store,
-    send_transaction_store,
     get_firefly_account_grouped_by_type,
+    send_transaction_store,
 )
+from firefly_automate.miscs import Inequality, select_option
 
 
 def transform_col_index_to_name(df: pd.DataFrame, columns: List[str]) -> Iterable[str]:
@@ -30,7 +29,7 @@ def transform_col_index_to_name(df: pd.DataFrame, columns: List[str]) -> Iterabl
 
 def filter_clean_dollar_format(value: str) -> str:
     """Make column with $100.00 or $1,234.00 works"""
-    if type(value) == float:
+    if type(value) is float:
         return value
     return str(float(value.lstrip("$").replace(",", "")))
 
@@ -38,7 +37,9 @@ def filter_clean_dollar_format(value: str) -> str:
 def filter_map_input_to_transaction_store_input(key: str, value: Any):
     """Map the input into correct type."""
     if key == "type":
-        return TransactionTypeProperty(value)
+        from firefly_iii_client.model import transaction_type_property
+
+        return transaction_type_property.TransactionTypeProperty(value)
     else:
         return value  # default
 
@@ -68,26 +69,6 @@ optional_attributes = [
     "payment_date",
     "invoice_date",
 ]
-
-
-def select_option(options, query: str = ""):
-    while True:
-        print(f"{query}")
-        for i, o in enumerate(options):
-            print(f" [{i+1}] {o}")
-        choice = input(f"Select [1-{len(options)}]: ")
-        print()
-        try:
-            choice = int(choice) - 1
-        except ValueError:
-            print("[ERROR] Invalid string.\n")
-            continue
-        if choice < 0 or choice >= len(options):
-            print("[ERROR] Choice is out of range.\n")
-            continue
-        options = list(options)
-        selected = options.pop(choice)
-        return selected, options
 
 
 def init_subparser(parser):
@@ -137,10 +118,18 @@ def init_subparser(parser):
     parser.add_argument(
         "-f",
         "--filter-by-col",
-        help="filter column with string",
+        help="filter rows via column with string",
         default=[],
         nargs="+",
         type=string_sep_with_equal_sign,
+    )
+    parser.add_argument(
+        "-fd",
+        "--filter-by-datetime",
+        help="filter rows via column with datetime",
+        default=[],
+        nargs="+",
+        type=Inequality.parse,
     )
     parser.add_argument(
         "-nn",
@@ -160,39 +149,33 @@ def init_subparser(parser):
 
 
 def ask_for_account_name():
-    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
-        api_instance = accounts_api.AccountsApi(api_client)
+    all_accs = get_firefly_account_grouped_by_type()
 
-        all_accs = group_by(
-            FireflyPagerWrapper(api_instance.list_account, "accounts").data_entries(),
-            functor=lambda x: x["attributes"]["type"],
+    with pd.option_context(
+        "display.max_columns",
+        None,
+        "display.max_rows",
+        None,
+        "display.max_colwidth",
+        0,
+        "display.width",
+        0,
+    ):
+        data = []
+        for k, grouped_acc in all_accs.items():
+            if k not in ["revenue", "expense"]:
+                for _acc in grouped_acc:
+                    data.append([_acc["id"], k, _acc["attributes"]["name"]])
+
+        bank_info_df = pd.DataFrame(
+            data,
+            columns=[
+                "id",
+                "type",
+                "Acc name",
+            ],
         )
-
-        with pd.option_context(
-            "display.max_columns",
-            None,
-            "display.max_rows",
-            None,
-            "display.max_colwidth",
-            0,
-            "display.width",
-            0,
-        ):
-            data = []
-            for k, grouped_acc in all_accs.items():
-                if k not in ["revenue", "expense"]:
-                    for _acc in grouped_acc:
-                        data.append([_acc["id"], k, _acc["attributes"]["name"]])
-
-            bank_info_df = pd.DataFrame(
-                data,
-                columns=[
-                    "id",
-                    "type",
-                    "Acc name",
-                ],
-            )
-            print(bank_info_df.to_markdown(index=False))
+        print(bank_info_df.to_markdown(index=False))
 
     bank_id = str(int(input("> what is the id of this bank account? ")))
 
@@ -209,35 +192,40 @@ def manual_mapping(df):
     print(" The following is your data")
     print(df.head())
     print("------------------------------")
-    selected, remainings = select_option(
-        df.columns, query="> which one is description?"
+    selected, remaining = select_option(
+        df.columns, query_prompt="> which one is description?"
     )
     new_df_data["description"] = df[selected]
 
-    selected, remainings = select_option(remainings, query="> which one is date?")
-    new_df_data["date"] = pd.to_datetime(df[selected], infer_datetime_format=True)
+    selected, remaining = select_option(remaining, query_prompt="> which one is date?")
+    new_df_data["date"] = pd.to_datetime(
+        df[selected],
+        # infer_datetime_format=True,
+    )
 
     selected, _ = select_option(
-        ["Yes", "No"], query="> do you have separated incoming/outgoing columns?"
+        ["Yes", "No"], query_prompt="> do you have separated incoming/outgoing columns?"
     )
 
     # selected = 'Ye'
-    # remainings = df.columns
+    # remaining = df.columns
 
     if selected == "No":
         raise NotImplementedError("")
     else:
         transaction_type = pd.Series([None] * len(df))
         amount = pd.Series([None] * len(df))
-        selected, remainings = select_option(
-            remainings, query="> which one is incoming (i.e. +'ve balance / Credit)?"
+        selected, remaining = select_option(
+            remaining,
+            query_prompt="> which one is incoming (i.e. +'ve balance / Credit)?",
         )
 
         transaction_type[~df[selected].isna()] = "deposit"
         amount[~df[selected].isna()] = df[selected].apply(filter_clean_dollar_format)
 
-        selected, remainings = select_option(
-            remainings, query="> which one is outgoing (i.e. -'ve balance / Debit)?"
+        selected, remaining = select_option(
+            remaining,
+            query_prompt="> which one is outgoing (i.e. -'ve balance / Debit)?",
         )
         transaction_type[~df[selected].isna()] = "withdrawal"
         amount[~df[selected].isna()] = df[selected].apply(filter_clean_dollar_format)
@@ -304,7 +292,10 @@ def auto_mapping(df, preset_mappings):
             # _remaining_mappings[k] = v
             new_df_data[v] = df[k]
         if v.endswith("date"):
-            new_df_data[v] = pd.to_datetime(new_df_data[v], infer_datetime_format=True)
+            new_df_data[v] = pd.to_datetime(
+                new_df_data[v],
+                #                 infer_datetime_format=True,
+            )
 
     print("==================================")
     print(" The following is your mapped data")
@@ -313,9 +304,9 @@ def auto_mapping(df, preset_mappings):
     return new_df_data
 
 
-def run(args: argparse.ArgumentParser):
+def run(args: argparse.Namespace):
     if not sys.stdin.isatty() and args.file_input is None:
-        # read frome stdin
+        # read from stdin
         args.file_input = sys.stdin
     elif sys.stdin.isatty() and args.file_input is None:
         args.parser.print_usage()
@@ -363,10 +354,25 @@ def run(args: argparse.ArgumentParser):
             df[col],
             # infer_datetime_format=True,
         )
+    for col, inequality_sign, datetime_val in args.filter_by_datetime:
+        from dateutil.parser import parse as dateutil_parser
+
+        _datetime_col = pd.to_datetime(
+            df[col],
+            utc=True,
+            # infer_datetime_format=True,
+            dayfirst=True,
+        ).dt.date
+        datetime_val = dateutil_parser(datetime_val, dayfirst=True).date()
+
+        mask = Inequality.compare(_datetime_col, inequality_sign, datetime_val)
+        df = df[mask]
 
     print("------------------------------")
     print(df.head())
     print("------------------------------")
+    if len(df) <= 0:
+        return
 
     # reset index for any filtered values
     df = df.reset_index()
@@ -400,7 +406,8 @@ def run(args: argparse.ArgumentParser):
     _zero_amount_transactions = df[df.amount.astype(float) == 0]
     if len(_zero_amount_transactions) > 0:
         print(
-            "> The following row(s) will be dropped because they have $0 dollars and are not allowed in firefly-iii."
+            "> The following row(s) will be dropped because they have $0 dollars "
+            "and are not allowed in firefly-iii."
         )
         print(_zero_amount_transactions)
         if input("Proceed?: [y/N] ").lower() != "y":
