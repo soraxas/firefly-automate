@@ -10,10 +10,10 @@ from firefly_automate.config_loader import config
 from firefly_automate.firefly_request_manager import send_transaction_delete
 from firefly_automate.miscs import (
     FireflyTransactionDataClass,
-    PendingUpdates,
     group_by,
     prompt_response,
 )
+from firefly_automate.data_type.pending_update import PendingUpdates
 
 LOGGER = logging.getLogger()
 

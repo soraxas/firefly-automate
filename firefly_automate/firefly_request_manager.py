@@ -19,9 +19,9 @@ from firefly_iii_client.model.transaction_store import TransactionStore
 from firefly_iii_client.model.transaction_type_filter import TransactionTypeFilter
 from firefly_iii_client.model.transaction_update import TransactionUpdate
 
-from firefly_automate.config_loader import YamlItemType, config
+from firefly_automate.config_loader import config
 from firefly_automate.connections_helpers import FireflyPagerWrapper
-from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 
 LOGGER = logging.getLogger(__name__)
 

@@ -1,6 +1,6 @@
 import dataclasses
 
-from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 from firefly_automate.rules.base_rule import Rule
 
 

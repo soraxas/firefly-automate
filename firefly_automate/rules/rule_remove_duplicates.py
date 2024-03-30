@@ -2,7 +2,7 @@ import dataclasses
 
 from schema import Schema
 
-from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 from firefly_automate.miscs import get_transaction_owner
 from firefly_automate.rules.base_rule import Rule
 

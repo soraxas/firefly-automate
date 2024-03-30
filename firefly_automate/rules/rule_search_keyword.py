@@ -2,7 +2,7 @@ from typing import Union
 
 from schema import Optional, Or, Schema
 
-from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text
 from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
 

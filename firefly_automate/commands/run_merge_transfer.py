@@ -14,7 +14,7 @@ from firefly_automate.firefly_request_manager import (
     send_transaction_delete,
     update_rule_action,
 )
-from firefly_automate.miscs import PendingUpdates
+from firefly_automate.data_type.pending_update import PendingUpdates
 
 LOGGER = logging.getLogger()
 

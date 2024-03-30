@@ -6,9 +6,11 @@ from typing import Dict, Set
 from schema import Schema
 
 from firefly_automate.config_loader import config
-from firefly_automate.firefly_datatype import FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 from firefly_automate.miscs import (
     FireflyIIIRulesConflictException,
+)
+from firefly_automate.data_type.pending_update import (
     PendingUpdates,
     TransactionUpdateValueType,
 )
