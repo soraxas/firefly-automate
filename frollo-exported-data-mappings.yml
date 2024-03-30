@@ -1,4 +1,7 @@
 
+# add the following to deriving / overriding yaml file
+# __base_setting_yaml: frollo-exported-data-mappings.yml
+
 column_mappings:
     transaction_id: external_id
     description: description
@@ -11,6 +14,9 @@ column_mappings:
     merchant_name: __auto-inv-source-destination__name
     budget_category: tag
     category_name: category_name
+
+date_format: '%Y-%m-%d'
+date_format_day_first: True
 
 filter_by_col:
     - account_name=My Cool Bank
