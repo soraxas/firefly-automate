@@ -15,6 +15,7 @@ from firefly_automate.firefly_request_manager import (
     send_transaction_delete,
     update_rule_action,
 )
+from firefly_automate.miscs import to_datetime
 
 LOGGER = logging.getLogger()
 
@@ -145,7 +146,7 @@ def run(args: argparse.ArgumentParser):
         ],
         columns=["type", "date", "id", "desc", "amount", "source", "dest"],
     )
-    df["date"] = pd.to_datetime(
+    df["date"] = to_datetime(
         df["date"],
         utc=True,
         # infer_datetime_format=True,

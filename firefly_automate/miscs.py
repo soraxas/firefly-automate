@@ -1,6 +1,7 @@
 import logging
 import pprint
 import re
+import argparse
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -14,6 +15,7 @@ from typing import (
     Union,
 )
 
+import pandas as pd
 from firefly_automate import firefly_request_manager
 
 if TYPE_CHECKING:
@@ -46,6 +48,25 @@ def get_transaction_owner(
 
 
 T = TypeVar("T")
+
+args: argparse.Namespace = None
+
+
+def set_args(_args):
+    global args
+    args = _args
+
+
+def to_datetime(x, **kwargs):
+    """
+    Custom to_datetime with default args
+    """
+    if "format" not in kwargs and hasattr(args, "date_format_day_first"):
+        kwargs["dayfirst"] = True
+    if "format" not in kwargs and hasattr(args, "date_format"):
+        kwargs["format"] = args.date_format
+
+    return pd.to_datetime(x, **kwargs)
 
 
 def group_by(

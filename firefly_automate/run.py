@@ -107,7 +107,7 @@ def init(args: argparse.Namespace):
         args.end = args.start + relativedelta(months=args.relative_months)
     LOGGER.debug("From: {} to {}", args.start, args.end)
     ####################################
-    miscs.always_override_reconciled = args.always_override_reconciled
+    miscs.set_args(args)
 
     setup_logger(args.debug)
 

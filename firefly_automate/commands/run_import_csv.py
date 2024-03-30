@@ -13,7 +13,7 @@ from firefly_automate.firefly_request_manager import (
     get_firefly_account_grouped_by_type,
     send_transaction_store,
 )
-from firefly_automate.miscs import Inequality, select_option
+from firefly_automate.miscs import Inequality, select_option, to_datetime
 
 
 def transform_col_index_to_name(df: pd.DataFrame, columns: List[str]) -> Iterable[str]:
@@ -104,6 +104,17 @@ def init_subparser(parser):
         default=True,
         dest="interpret_int_as_column",
         action="store_false",
+    )
+    parser.add_argument(
+        "--date-format",
+        help="date format for parsing",
+        default=None,
+        type=str,
+    )
+    parser.add_argument(
+        "--target-bank-name",
+        default=None,
+        type=str,
     )
     parser.add_argument(
         "--source-name",
@@ -198,10 +209,7 @@ def manual_mapping(df):
     new_df_data["description"] = df[selected]
 
     selected, remaining = select_option(remaining, query_prompt="> which one is date?")
-    new_df_data["date"] = pd.to_datetime(
-        df[selected],
-        # infer_datetime_format=True,
-    )
+    new_df_data["date"] = to_datetime(df[selected])
 
     selected, _ = select_option(
         ["Yes", "No"], query_prompt="> do you have separated incoming/outgoing columns?"
@@ -292,10 +300,7 @@ def auto_mapping(df, preset_mappings):
             # _remaining_mappings[k] = v
             new_df_data[v] = df[k]
         if v.endswith("date"):
-            new_df_data[v] = pd.to_datetime(
-                new_df_data[v],
-                #                 infer_datetime_format=True,
-            )
+            new_df_data[v] = to_datetime(new_df_data[v])
 
     print("==================================")
     print(" The following is your mapped data")
@@ -324,6 +329,14 @@ def run(args: argparse.Namespace):
 
     if args.load_mappings:
         mappings = yaml.safe_load(Path(args.load_mappings).read_text())
+        # see if there's a base setting. if so, merge them.
+        _base_mapping_fname = mappings.pop("__base_setting_yaml", None)
+        if _base_mapping_fname:
+            _base_mapping = yaml.safe_load(Path(_base_mapping_fname).read_text())
+            # merge with base
+            for k, v in _base_mapping.items():
+                if k not in mappings:
+                    mappings[k] = v
 
         args.column_mappings = mappings.pop("column_mappings", None)
 
@@ -334,12 +347,18 @@ def run(args: argparse.Namespace):
         if "non_null_by_col" in mappings:
             args.non_null_by_col.extend(mappings.pop("non_null_by_col"))
 
-        if len(mappings) > 0:
-            print(
-                f">> There are unused mappings in the given '{args.load_mappings}' file.\n"
-                f">> Including keys: {list(mappings.keys())}.\n"
-                f">> Full content: {mappings}.\n"
-            )
+        allowed_mappings = {"target_bank_name", "date_format"}
+
+        for key in mappings:
+            if key not in allowed_mappings:
+                print(
+                    f">> There are unused mappings in the given '{args.load_mappings}' file.\n"
+                    f">> Including keys: {list(mappings.keys())}.\n"
+                    f">> Full content: {mappings}.\n"
+                )
+                exit(1)
+            # assign to args for later access
+            setattr(args, key, mappings[key])
 
     ############################################################
 
@@ -350,19 +369,11 @@ def run(args: argparse.Namespace):
     for col in args.non_null_by_col:
         df = df[~df[col].isna()]
     for col in args.as_datetime:
-        df[col] = pd.to_datetime(
-            df[col],
-            # infer_datetime_format=True,
-        )
+        df[col] = to_datetime(df[col])
     for col, inequality_sign, datetime_val in args.filter_by_datetime:
         from dateutil.parser import parse as dateutil_parser
 
-        _datetime_col = pd.to_datetime(
-            df[col],
-            utc=True,
-            # infer_datetime_format=True,
-            dayfirst=True,
-        ).dt.date
+        _datetime_col = to_datetime(df[col]).dt.date
         datetime_val = dateutil_parser(datetime_val, dayfirst=True).date()
 
         mask = Inequality.compare(_datetime_col, inequality_sign, datetime_val)
@@ -382,14 +393,16 @@ def run(args: argparse.Namespace):
     else:
         df = auto_mapping(df, args.column_mappings)
 
-    bank_name = ask_for_account_name()
+    bank_name = args.target_bank_name if hasattr(args, "target_bank_name") else None
+    if bank_name is None:
+        bank_name = ask_for_account_name()
     if args.source_name is None:
         args.source_name = bank_name
     if args.destination_name is None:
         args.destination_name = bank_name
 
-    df.loc[im_destination(df), f"destination_name"] = bank_name
-    df.loc[im_source(df), f"source_name"] = bank_name
+    df.loc[im_destination(df), "destination_name"] = bank_name
+    df.loc[im_source(df), "source_name"] = bank_name
 
     with pd.option_context(
         "display.max_columns", None, "display.max_colwidth", 20, "display.width", 0

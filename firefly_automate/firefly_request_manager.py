@@ -3,6 +3,7 @@ import functools
 import logging
 from typing import Dict, Iterable, Tuple
 
+import pandas as pd
 import firefly_iii_client
 from firefly_iii_client import Configuration
 from firefly_iii_client.api import accounts_api, rules_api, transactions_api
@@ -198,7 +199,7 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
             api_response = _raw_send(transaction_id, transaction_update)
         except firefly_iii_client.ApiException as e:
             if "This transaction is already reconciled" in e.body:
-                if miscs.always_override_reconciled or miscs.prompt_response(
+                if miscs.args.always_override_reconciled or miscs.prompt_response(
                     f"> Transaction {transaction_id} is already reconciled. Override?"
                 ):
                     # first remove reconcile
@@ -234,6 +235,15 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
 
 
 def create_transaction_store(transaction_data: Dict, apply_rules: bool = True):
+    print(transaction_data)
+    for k, v in list(transaction_data.items()):
+        # replace null to none
+        if pd.isnull(v):
+            transaction_data[k] = None
+            # transaction_data.pop(k)
+        if k == "tag":
+            transaction_data[k] = [v]
+
     return TransactionStore(
         apply_rules=apply_rules,
         transactions=[
