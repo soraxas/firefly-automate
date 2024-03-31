@@ -347,12 +347,13 @@ def run(args: argparse.Namespace):
         if "non_null_by_col" in mappings:
             args.non_null_by_col.extend(mappings.pop("non_null_by_col"))
 
-        allowed_mappings = {"target_bank_name", "date_format"}
+        allowed_mappings = {"target_bank_name", "date_format", "date_format_day_first"}
 
         for key in mappings:
             if key not in allowed_mappings:
                 print(
                     f">> There are unused mappings in the given '{args.load_mappings}' file.\n"
+                    f">> Unused keys: {key}.\n"
                     f">> Including keys: {list(mappings.keys())}.\n"
                     f">> Full content: {mappings}.\n"
                 )
@@ -373,7 +374,10 @@ def run(args: argparse.Namespace):
     for col, inequality_sign, datetime_val in args.filter_by_datetime:
         from dateutil.parser import parse as dateutil_parser
 
-        _datetime_col = to_datetime(df[col]).dt.date
+        try:
+            _datetime_col = to_datetime(df[col]).dt.date
+        except:
+            print(f"> exception during time parsing with col {col}")
         datetime_val = dateutil_parser(datetime_val, dayfirst=True).date()
 
         mask = Inequality.compare(_datetime_col, inequality_sign, datetime_val)
@@ -392,6 +396,9 @@ def run(args: argparse.Namespace):
         df = manual_mapping(df)
     else:
         df = auto_mapping(df, args.column_mappings)
+
+    # sort by date
+    df.sort_values(by="date", inplace=True)
 
     bank_name = args.target_bank_name if hasattr(args, "target_bank_name") else None
     if bank_name is None:

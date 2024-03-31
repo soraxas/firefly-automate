@@ -88,15 +88,15 @@ def search_keywords_in_text(
 ) -> Union[bool, Match[str]]:
     """Return true or false depending on whether the token is found."""
     if type(keywords) is list:
-        _keyword = "|".join(f"({re.escape(k)})" for k in keywords)
+        _keyword_regex = "|".join(r"\b({})\b".format(re.escape(k)) for k in keywords)
     elif type(keywords) is str:
-        _keyword = keywords
+        _keyword_regex = r"\b%s\b" % keywords
     else:
         raise ValueError(f"{keywords} is of type {type(keywords)}")
 
     if text_to_search is not None:
         assert type(text_to_search) is str, type(text_to_search)
-        keyword_search = re.compile(r"\b%s\b" % _keyword, re.I)
+        keyword_search = re.compile(_keyword_regex, re.I)
         result = keyword_search.search(text_to_search)
         if result:
             return result

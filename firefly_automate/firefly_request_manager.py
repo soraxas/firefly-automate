@@ -84,46 +84,46 @@ def get_rule_by_title(title: str):
     return None
 
 
-def create_rule_if_not_exists(title: str, rule_group_title: str):
-    rule = get_rule_by_title(title)
-    if rule is None:
-        with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
-            # Create an instance of the API class
-            api_instance = rules_api.RulesApi(api_client)
-            body = RuleStore(
-                actions=[
-                    RuleActionStore(
-                        active=True,
-                        order=0,
-                        stop_processing=False,
-                        type=RuleActionKeyword("convert_transfer"),
-                        value="Westpac Choice",
-                    )
-                ],
-                active=True,
-                description="Auto generated rule",
-                order=0,
-                rule_group_title=f"AUTOGEN_{rule_group_title}",
-                rule_group_id="7",
-                stop_processing=False,
-                strict=True,
-                title=title,
-                trigger=RuleTriggerType("store-journal"),
-                triggers=[
-                    RuleTriggerStore(
-                        active=True,
-                        order=0,
-                        stop_processing=False,
-                        type=RuleTriggerKeyword("user_action"),
-                        value="tag1",
-                    )
-                ],
-            )
-            # Store a new rule
-            api_response = api_instance.store_rule(
-                body,
-            )
-    return rule
+# def create_rule_if_not_exists(title: str, rule_group_title: str):
+#     rule = get_rule_by_title(title)
+#     if rule is None:
+#         with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
+#             # Create an instance of the API class
+#             api_instance = rules_api.RulesApi(api_client)
+#             body = RuleStore(
+#                 actions=[
+#                     RuleActionStore(
+#                         active=True,
+#                         order=0,
+#                         stop_processing=False,
+#                         type=RuleActionKeyword("convert_transfer"),
+#                         value="Westpac Choice",
+#                     )
+#                 ],
+#                 active=True,
+#                 description="Auto generated rule",
+#                 order=0,
+#                 rule_group_title=f"AUTOGEN_{rule_group_title}",
+#                 rule_group_id="7",
+#                 stop_processing=False,
+#                 strict=True,
+#                 title=title,
+#                 trigger=RuleTriggerType("store-journal"),
+#                 triggers=[
+#                     RuleTriggerStore(
+#                         active=True,
+#                         order=0,
+#                         stop_processing=False,
+#                         type=RuleTriggerKeyword("user_action"),
+#                         value="tag1",
+#                     )
+#                 ],
+#             )
+#             # Store a new rule
+#             api_response = api_instance.store_rule(
+#                 body,
+#             )
+#     return rule
 
 
 def update_rule_action(id: str, action_packs: Tuple[str, str]):
@@ -193,7 +193,10 @@ def get_firefly_account_grouped_by_type():
 
 def send_transaction_update(transaction_id: int, transaction_update: TransactionUpdate):
     def _raw_send(_id, _tran_update):
-        return api_instance.update_transaction(str(_id), _tran_update)
+        path_params = {"id": str(_id)}
+        return api_instance.update_transaction(
+            path_params=path_params, body=transaction_update
+        )
 
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = transactions_api.TransactionsApi(api_client)
