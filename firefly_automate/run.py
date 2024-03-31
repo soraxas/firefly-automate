@@ -80,15 +80,16 @@ parser.add_argument(
 
 def _get_transactions():
     global ARGS
-    if not ARGS.use_cache or not os.path.exists(ARGS.cache_file_name):
-        all_transactions = list(get_transactions(ARGS.start, ARGS.end))
-
-        # if ARGS.use_cache:
-        with open(ARGS.cache_file_name, "wb") as f:
-            pickle.dump(all_transactions, f)
+    if ARGS.use_cache:
+        if os.path.exists(ARGS.cache_file_name):
+            with open(ARGS.cache_file_name, "rb") as f:
+                all_transactions = pickle.load(f)
+        else:
+            all_transactions = list(get_transactions(ARGS.start, ARGS.end))
+            with open(ARGS.cache_file_name, "wb") as f:
+                pickle.dump(all_transactions, f)
     else:
-        with open(ARGS.cache_file_name, "rb") as f:
-            all_transactions = pickle.load(f)
+        all_transactions = list(get_transactions(ARGS.start, ARGS.end))
 
     LOGGER.debug(all_transactions)
     return all_transactions
