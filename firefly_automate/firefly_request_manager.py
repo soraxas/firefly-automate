@@ -3,8 +3,8 @@ import functools
 import logging
 from typing import Dict, Iterable, Tuple
 
-import pandas as pd
 import firefly_iii_client
+import pandas as pd
 from firefly_iii_client import Configuration
 from firefly_iii_client.apis.tags import accounts_api, rules_api, transactions_api
 from firefly_iii_client.model.rule_action_keyword import RuleActionKeyword

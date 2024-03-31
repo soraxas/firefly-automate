@@ -1,12 +1,10 @@
+import atexit
+from multiprocessing import Lock
+from multiprocessing.pool import ThreadPool
 from typing import Any, Callable, Dict, Iterator
 
 import tqdm
-import atexit
-
-from multiprocessing import Lock
-from multiprocessing.pool import ThreadPool
-
-from firefly_iii_client.schemas import NoneClass, BoolClass
+from firefly_iii_client.schemas import BoolClass, NoneClass
 
 
 class _AsyncRequest:
@@ -44,6 +42,7 @@ class _AsyncRequest:
 AsyncRequest = _AsyncRequest()
 
 from decimal import Decimal
+
 import frozendict
 
 
@@ -154,7 +153,6 @@ class FireflyPagerWrapper:
             ret = self.functor(*args, **kwargs)
             ret = DynamicSchema_to_primitives(ret.body)
             with threading_lock:
-
                 self.pbar.update(int(ret["meta"]["pagination"]["count"]))
             return ret
 

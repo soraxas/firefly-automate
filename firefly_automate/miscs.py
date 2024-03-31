@@ -1,7 +1,7 @@
+import argparse
 import logging
 import pprint
 import re
-import argparse
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -16,6 +16,7 @@ from typing import (
 )
 
 import pandas as pd
+
 from firefly_automate import firefly_request_manager
 
 if TYPE_CHECKING:
