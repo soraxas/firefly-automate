@@ -6,7 +6,7 @@ from typing import Dict, Iterable, Tuple
 import pandas as pd
 import firefly_iii_client
 from firefly_iii_client import Configuration
-from firefly_iii_client.api import accounts_api, rules_api, transactions_api
+from firefly_iii_client.apis.tags import accounts_api, rules_api, transactions_api
 from firefly_iii_client.model.rule_action_keyword import RuleActionKeyword
 from firefly_iii_client.model.rule_action_store import RuleActionStore
 from firefly_iii_client.model.rule_action_update import RuleActionUpdate
@@ -40,7 +40,9 @@ def get_firefly_client_conf() -> Configuration:
     # satisfies your auth use case.
 
     # Configure OAuth2 access token for authorization: firefly_iii_auth
-    configuration = firefly_iii_client.Configuration(host=config["firefly_iii_host"])
+    configuration = firefly_iii_client.Configuration(
+        host=config["firefly_iii_host"].rstrip("/") + "/api"
+    )
     configuration.access_token = config["firefly_iii_token"]
 
     # Enter a context with an instance of the API client
