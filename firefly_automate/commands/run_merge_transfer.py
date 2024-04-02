@@ -1,7 +1,9 @@
 #!/bin/env python
 import argparse
+import atexit
 import logging
 from dataclasses import dataclass
+from multiprocessing import Lock
 from typing import List
 
 import numpy as np
@@ -9,6 +11,7 @@ import pandas as pd
 import pytz
 import tqdm
 
+from firefly_automate.connections_helpers import AsyncRequest, ignore_keyboard_interrupt
 from firefly_automate.data_type.pending_update import PendingUpdates
 from firefly_automate.firefly_request_manager import (
     get_merge_as_transfer_rule_id,
@@ -18,6 +21,30 @@ from firefly_automate.firefly_request_manager import (
 from firefly_automate.miscs import to_datetime
 
 LOGGER = logging.getLogger()
+
+
+# this is a lock to make sure that the rule trigger and tagging operation is an atomic operation
+RULE_AND_TAGGING_LOCK = Lock()
+
+
+def merge_atomic_operation(_transfer_update, dest_acc_name: str):
+    with RULE_AND_TAGGING_LOCK:
+        # set the rule to auto convert tagged transaction to this destination
+        update_rule_action(
+            id=get_merge_as_transfer_rule_id(),
+            action_packs=[
+                (
+                    "convert_transfer",
+                    dest_acc_name,
+                ),
+                (
+                    "remove_tag",
+                    "AUTOMATE_convert-as-transfer",
+                ),
+            ],
+        )
+        # now let's add this new tag to the withdrawal
+        _transfer_update.apply(dry_run=False)
 
 
 @dataclass
@@ -54,18 +81,33 @@ def init_subparser(parser):
     parser.add_argument(
         "--batch-size",
         help="The batch size to confirm the pending transfer merges from user.",
-        default=5,
+        default=3,
         type=int,
     )
 
 
-def process_in_batch(pending_updates: List[MergingRequest]):
+REGISTERED_ON_EXIT_STATUS = False
+
+
+# define a function that keep track of successful merge requests
+def _on_exit_status(_queue):
+    # wait for all async process to finish
+    successes = []
+    for p in tqdm.tqdm(_queue, desc="Waiting for updates to finish in background."):
+        ignore_keyboard_interrupt(
+            lambda: successes.append(p.get()),
+            reason="waiting to show current background jobs status.",
+        )
+    print(f"Successes: {sum(s for s in successes if s is True)}/{len(_queue)}")
+
+
+def process_in_batch(pending_updates: List[MergingRequest], _async_process_Q: List):
     if len(pending_updates) == 0:
         return
 
-    print("========================")
+    print("^^^^^^^^^^^^^^^^^^^^^^^^")
     print()
-    print("========================")
+    print("vvvvvvvvvvvvvvvvvvvvvvvv")
 
     def print_pending_updates(pending_updates):
         for i, pending_update in enumerate(pending_updates):
@@ -83,23 +125,26 @@ def process_in_batch(pending_updates: List[MergingRequest]):
         if inputs in ("n", "N", ""):
             break
         if inputs.lower() == "y":
-            for updates in tqdm.tqdm(pending_updates, desc="Applying updates"):
-                update_rule_action(
-                    id=get_merge_as_transfer_rule_id(),
-                    action_packs=[
-                        (
-                            "convert_transfer",
-                            updates.destination_acc_name,
-                        ),
-                        (
-                            "remove_tag",
-                            "AUTOMATE_convert-as-transfer",
-                        ),
-                    ],
-                )
-                updates.withdrawl_to_transfer_update.apply(dry_run=False)
+            # send to run in background.
+            def runner(_updates):
+                # for updates in tqdm.tqdm(pending_updates, desc="Applying updates"):
+                for updates in _updates:
+                    merge_atomic_operation(
+                        updates.withdrawl_to_transfer_update,
+                        dest_acc_name=updates.destination_acc_name,
+                    )
+                    # and delete the corresponding deposit event
+                    send_transaction_delete(updates.deposit_transaction_to_delete)
+                return True
 
-                send_transaction_delete(updates.deposit_transaction_to_delete)
+            _async_process_Q.append(
+                AsyncRequest.run(runner, _updates=list(pending_updates))
+            )
+            global REGISTERED_ON_EXIT_STATUS
+            if not REGISTERED_ON_EXIT_STATUS:
+                # register an on-exit status on-demand (so that it will be processed first via FILO)
+                REGISTERED_ON_EXIT_STATUS = True
+                atexit.register(_on_exit_status, _queue=_async_process_Q)
             break
         else:
             try:
@@ -118,6 +163,7 @@ def process_in_batch(pending_updates: List[MergingRequest]):
             if len(pending_updates) == 0:
                 break
             print_pending_updates(pending_updates)
+    return True
 
     # pending_deletes.clear()
 
@@ -162,7 +208,9 @@ def run(args: argparse.ArgumentParser):
 
     PENDING_DELETE_ID = set()
 
-    process_Q = []
+    async_process_Q = []
+
+    process_batch = []
     for withdrawal_idx in range(amount_different.shape[0]):
         # potential match based on date being similar
         potential_match_deposit_indices = np.where(
@@ -235,7 +283,7 @@ def run(args: argparse.ArgumentParser):
 
                 canidate_transfer_to = potential_match_by_date.iloc[0]
 
-                process_Q.append(
+                process_batch.append(
                     MergingRequest(
                         info_df=info_df,
                         destination_acc_name=canidate_transfer_to.dest,
@@ -251,10 +299,11 @@ def run(args: argparse.ArgumentParser):
                         deposit_transaction_to_delete=canidate_transfer_to.id,
                     )
                 )
-
-                if len(process_Q) >= args.batch_size:
-                    process_in_batch(process_Q)
-                    process_Q.clear()
-
                 PENDING_DELETE_ID.add(canidate_transfer_to.id)
-    process_in_batch(process_Q)
+
+                if len(process_batch) >= args.batch_size:
+                    process_in_batch(process_batch, async_process_Q)
+                    process_batch.clear()
+
+    process_in_batch(process_batch, async_process_Q)
+    process_batch.clear()

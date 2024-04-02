@@ -144,8 +144,8 @@ def update_rule_action(id: str, action_packs: Tuple[str, str]):
         try:
             # Update existing rule.
             api_response = api_instance.update_rule(
-                id=id,
-                rule_update=body,
+                path_params=dict(id=id),
+                body=body,
             )
         except firefly_iii_client.ApiException as e:
             print("Exception when calling RulesApi->update_rule: %s\n" % e)
@@ -195,7 +195,8 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
     def _raw_send(_id, _tran_update):
         path_params = {"id": str(_id)}
         return api_instance.update_transaction(
-            path_params=path_params, body=transaction_update
+            path_params=path_params,
+            body=transaction_update,
         )
 
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
@@ -240,7 +241,6 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
 
 
 def create_transaction_store(transaction_data: Dict, apply_rules: bool = True):
-    print(transaction_data)
     for k, v in list(transaction_data.items()):
         # replace null to none
         if pd.isnull(v):
@@ -272,7 +272,9 @@ def send_transaction_store(transaction_store: TransactionStore):
 def send_transaction_delete(transaction_id: int):
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = transactions_api.TransactionsApi(api_client)
-        api_response = api_instance.delete_transaction(str(transaction_id))
+        api_response = api_instance.delete_transaction(
+            path_params=dict(id=transaction_id),
+        )
         return api_response
 
 

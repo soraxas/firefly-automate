@@ -7,6 +7,14 @@ import tqdm
 from firefly_iii_client.schemas import BoolClass, NoneClass
 
 
+def ignore_keyboard_interrupt(functor: Callable[[], Any], reason: str = "something"):
+    while True:
+        try:
+            return functor()
+        except KeyboardInterrupt:
+            print(f"> Ignoring KeyboardInterrupt, because of {reason}.")
+
+
 class _AsyncRequest:
     _pool = None
     _instance = None
@@ -22,11 +30,16 @@ class _AsyncRequest:
 
     def close(self):
         if self._pool:
-            self._pool.close()
-            self._pool.join()
+            ignore_keyboard_interrupt(
+                lambda: self._pool.close(), reason="waiting for jobs to finish"
+            )
+            ignore_keyboard_interrupt(
+                lambda: self._pool.join(), reason="waiting for jobs to finish"
+            )
             self._pool = None
             if hasattr(atexit, "unregister"):
                 atexit.unregister(self.close)
+            print("> finished all background jobs.")
 
     @property
     def pool(self):
