@@ -5,8 +5,8 @@
 column_mappings:
     transaction_id: external_id
     description: description
-    amount: __auto-abs__amount
-    credit_debit: __auto-type:debit-credit:__type
+    amount: __auto-abs:amount
+    credit_debit: __auto-type:debit-credit:type
     currency: currency_code
     transaction_date: date
     posted_date: process_date

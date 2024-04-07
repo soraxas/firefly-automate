@@ -2,8 +2,9 @@
 import argparse
 import sys
 from pathlib import Path
-from typing import Any, Iterable, List
+from typing import Any, Iterable, List, Tuple
 
+import re
 import pandas as pd
 import tqdm
 import yaml
@@ -251,18 +252,53 @@ im_destination = lambda _d: _d.type == "deposit"
 def auto_mapping(df, preset_mappings):
     new_df_data = pd.DataFrame()
 
+    def __split_by_colon(_str, nparts: int = 3):
+        # this regex split on colon that are not escaped by backslash \
+        _parts = re.split(r"(?<!\\):", _str)
+
+        assert len(_parts) == nparts, f"must have {nparts} parts separated by colon"
+        # replace any escaped colon back to its original form
+        return [p.replace(r"\:", ":") for p in _parts]
+
+    def _assign_col(map_to_col, data, override: bool = False):
+        if override or map_to_col not in new_df_data:
+            new_df_data[map_to_col] = data
+            return
+        if map_to_col == "tag":
+            raise NotImplementedError(
+                "Multi-Tag is not implemented (they will override each other right now.)"
+            )
+        new_df_data[map_to_col] += data
+
     def _process_special(source, extract_as):
-        if extract_as == "__auto-abs__amount":
-            new_df_data["amount"] = df[source].astype(float).abs().astype(str)
+        if extract_as.startswith("__auto-abs:"):
+            _, map_to_col = __split_by_colon(extract_as, 2)
+            _assign_col(map_to_col, df[source].astype(float).abs().astype(str))
+
+        elif extract_as.startswith("__strip:"):
+            _, map_to_col = __split_by_colon(extract_as, 2)
+            _assign_col(map_to_col, df[source].str.strip("'\"\n\t "))
 
         elif extract_as.startswith("__auto-type:"):
-            # map from the specified keyword into either withdrawal or deposit
-            withdrawal, deposit = extract_as.split(":")[1].split("-")
+            _, _conf, map_to_col = __split_by_colon(extract_as, 3)
+            withdrawal, deposit = _conf.split("-")
 
+            # map from the specified keyword into either withdrawal or deposit
             _series = pd.Series([None] * len(df), dtype=object)
             _series[df[source] == withdrawal] = "withdrawal"
             _series[df[source] == deposit] = "deposit"
-            new_df_data["type"] = _series
+            _assign_col(map_to_col, _series)
+
+        elif extract_as.startswith("__auto-pos-neg:"):
+            _, _conf, map_to_col = __split_by_colon(extract_as, 3)
+            pos, neg = _conf.split("-")
+
+            # assign based on whether this column is positive or negative
+            __col_as_float = df[source].astype(float)
+            _series = pd.Series([None] * len(df), dtype=object)
+            _series[__col_as_float > 0] = pos
+            _series[__col_as_float < 0] = neg
+            _assign_col(map_to_col, _series)
 
         elif extract_as.startswith("__auto-source-destination__"):
             # assign based on whether this is a source acc or destination acc
@@ -282,25 +318,57 @@ def auto_mapping(df, preset_mappings):
                 source
             ]
 
+        elif extract_as.startswith("__py-expr:"):
+            _, _expression, map_to_col = __split_by_colon(extract_as, 3)
+
+            # DANGEROUS of eval any arbitary expression. You need to trust your own config.
+            def __run(x: pd.Series):
+                return eval(_expression)
+
+            _assign_col(map_to_col, __run(df[source]))
+
+        elif extract_as.startswith("__"):
+            raise NotImplementedError(
+                f"Detected special rule '{extract_as}', but I don't "
+                "know how to handle that."
+            )
         else:
             return False
         return True
 
-    # very very first, process the type of transaction
+    mapping_pairs: List[Tuple[str, str]] = []
     for k, v in preset_mappings.items():
-        if v.endswith("type"):
-            _process_special(k, v)
-    _transactions_as_source = im_source(new_df_data)
-    _transactions_as_destination = im_destination(new_df_data)
+        # make it so that we supports using list in a key-val reference.
+        if not isinstance(v, list):
+            v = [v]
+        mapping_pairs.extend([(k, _v) for _v in v])
+    del preset_mappings
+
+    def process_type_first(_mapping_pairs):
+        # very very first, process the type of transaction
+        # that's because many rules depends on knowing if a given transaction is source or dest first.
+        new_mapping_pairs = []
+        for k, v in _mapping_pairs:
+            if v.endswith("type"):
+                _process_special(k, v)
+            else:
+                new_mapping_pairs.append((k, v))
+        return new_mapping_pairs
+
+    mapping_pairs = process_type_first(mapping_pairs)
+    _transactions_as_source = im_source(new_df_data)  # keep track for future reference
+    _transactions_as_destination = im_destination(
+        new_df_data
+    )  # keep track for future reference
 
     # first process all the special ones
-    for k, v in preset_mappings.items():
+    for k, v in mapping_pairs:
         print(k, v)
         if not _process_special(k, v):  # True == processed
             # _remaining_mappings[k] = v
-            new_df_data[v] = df[k]
+            _assign_col(v, df[k])
         if v.endswith("date"):
-            new_df_data[v] = to_datetime(new_df_data[v])
+            _assign_col(v, to_datetime(new_df_data[v]), override=True)
 
     print("==================================")
     print(" The following is your mapped data")
@@ -347,7 +415,11 @@ def run(args: argparse.Namespace):
         if "non_null_by_col" in mappings:
             args.non_null_by_col.extend(mappings.pop("non_null_by_col"))
 
-        allowed_mappings = {"target_account_name", "date_format", "date_format_day_first"}
+        allowed_mappings = {
+            "target_account_name",
+            "date_format",
+            "date_format_day_first",
+        }
 
         for key in mappings:
             if key not in allowed_mappings:
@@ -400,7 +472,9 @@ def run(args: argparse.Namespace):
     # sort by date
     df.sort_values(by="date", inplace=True)
 
-    account_name = args.target_account_name if hasattr(args, "target_account_name") else None
+    account_name = (
+        args.target_account_name if hasattr(args, "target_account_name") else None
+    )
     if account_name is None:
         account_name = ask_for_account_name()
     if args.source_name is None:
