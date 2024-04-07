@@ -112,7 +112,7 @@ def init_subparser(parser):
         type=str,
     )
     parser.add_argument(
-        "--target-bank-name",
+        "--target-account-name",
         default=None,
         type=str,
     )
@@ -190,11 +190,11 @@ def ask_for_account_name():
 
     bank_id = str(int(input("> what is the id of this bank account? ")))
 
-    bank_names = bank_info_df[bank_info_df.id == bank_id]["Acc name"]
-    if len(bank_names) != 1:
-        print(f"> invalid choice. Result is {bank_names}")
-    bank_name = bank_names.iloc[0]
-    return bank_name
+    account_names = bank_info_df[bank_info_df.id == bank_id]["Acc name"]
+    if len(account_names) != 1:
+        print(f"> invalid choice. Result is {account_names}")
+    account_name = account_names.iloc[0]
+    return account_name
 
 
 def manual_mapping(df):
@@ -347,7 +347,7 @@ def run(args: argparse.Namespace):
         if "non_null_by_col" in mappings:
             args.non_null_by_col.extend(mappings.pop("non_null_by_col"))
 
-        allowed_mappings = {"target_bank_name", "date_format", "date_format_day_first"}
+        allowed_mappings = {"target_account_name", "date_format", "date_format_day_first"}
 
         for key in mappings:
             if key not in allowed_mappings:
@@ -400,16 +400,16 @@ def run(args: argparse.Namespace):
     # sort by date
     df.sort_values(by="date", inplace=True)
 
-    bank_name = args.target_bank_name if hasattr(args, "target_bank_name") else None
-    if bank_name is None:
-        bank_name = ask_for_account_name()
+    account_name = args.target_account_name if hasattr(args, "target_account_name") else None
+    if account_name is None:
+        account_name = ask_for_account_name()
     if args.source_name is None:
-        args.source_name = bank_name
+        args.source_name = account_name
     if args.destination_name is None:
-        args.destination_name = bank_name
+        args.destination_name = account_name
 
-    df.loc[im_destination(df), "destination_name"] = bank_name
-    df.loc[im_source(df), "source_name"] = bank_name
+    df.loc[im_destination(df), "destination_name"] = account_name
+    df.loc[im_source(df), "source_name"] = account_name
 
     with pd.option_context(
         "display.max_columns", None, "display.max_colwidth", 20, "display.width", 0
