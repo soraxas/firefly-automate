@@ -62,10 +62,16 @@ def to_datetime(x, **kwargs):
     """
     Custom to_datetime with default args
     """
-    if "format" not in kwargs and hasattr(args, "date_format_day_first"):
-        kwargs["dayfirst"] = True
     if "format" not in kwargs and hasattr(args, "date_format"):
         kwargs["format"] = args.date_format
+
+    # australia normally has day first.
+    if "format" not in kwargs:
+        try:
+            dayfirst = args.date_format_day_first
+        except AttributeError:
+            dayfirst = True
+        kwargs["dayfirst"] = dayfirst
 
     return pd.to_datetime(x, **kwargs)
 

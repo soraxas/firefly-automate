@@ -115,8 +115,8 @@ def process_in_batch(pending_updates: List[MergingRequest], _async_process_Q: Li
             print_df(pending_update.info_df)
             print(f"=" * (20 * 2 + 3))
 
-    print_pending_updates(pending_updates)
     while True:
+        print_pending_updates(pending_updates)
         print(
             ">> IMPORTANT: Review the above output and see if the updates are ok. Or enter space-separated number to ignore:"
         )
