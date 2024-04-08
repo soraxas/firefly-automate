@@ -238,6 +238,14 @@ def manual_mapping(df):
         transaction_type[~df[selected].isna()] = "withdrawal"
         amount[~df[selected].isna()] = df[selected].apply(filter_clean_dollar_format)
 
+        if (amount.astype(float) < 0).sum() > 0:
+            selected, remaining = select_option(
+                ["Yes", "No"],
+                query_prompt="> There's negative value in amount column. Apply absolute value?",
+            )
+            if selected == "Yes":
+                amount = amount.astype(float).abs().astype(str)
+
         new_df_data["type"] = transaction_type
         new_df_data["amount"] = amount
 
