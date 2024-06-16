@@ -6,7 +6,6 @@ import pickle
 from datetime import datetime
 
 import argcomplete
-from dateutil.parser import parse as dateutil_parser
 from dateutil.relativedelta import relativedelta
 
 from firefly_automate.config_loader import config
@@ -30,14 +29,14 @@ parser.add_argument(
     "--start",
     default=None,
     help="Start date for the range of transactions to process (default 3 months ago)",
-    type=lambda x: dateutil_parser(x, dayfirst=True).date(),
+    type=miscs.my_dateutil_parser,
 )
 parser.add_argument(
     "-e",
     "--end",
     default=None,
     help="End date for the range of transactions to process",
-    type=lambda x: dateutil_parser(x, dayfirst=True).date(),
+    type=miscs.my_dateutil_parser,
 )
 parser.add_argument(
     "--wait-for-all-transaction",

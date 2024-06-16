@@ -17,6 +17,8 @@ from typing import (
 
 import pandas as pd
 
+from datetime import datetime
+from dateutil.parser import parse as dateutil_parser
 from firefly_automate import firefly_request_manager
 
 if TYPE_CHECKING:
@@ -234,6 +236,12 @@ def select_option(
     except KeyboardInterrupt:
         print("\n> Aborting...")
         exit()
+
+
+def my_dateutil_parser(x: str):
+    if x.lower() == "now":
+        return datetime.now().date()
+    return dateutil_parser(x, dayfirst=True).date()
 
 
 class Inequality:
