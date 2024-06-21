@@ -2,7 +2,7 @@
 import argparse
 import logging
 import os
-import pickle
+import shelve
 from datetime import datetime
 
 import argcomplete
@@ -79,24 +79,24 @@ parser.add_argument(
 
 def _get_transactions():
     global ARGS
-    if ARGS.use_cache:
-        if os.path.exists(ARGS.cache_file_name):
-            with open(ARGS.cache_file_name, "rb") as f:
-                all_transactions = pickle.load(f)
-        else:
-            all_transactions = list(get_transactions(ARGS.start, ARGS.end))
-            with open(ARGS.cache_file_name, "wb") as f:
-                pickle.dump(all_transactions, f)
-    else:
-        all_transactions = list(get_transactions(ARGS.start, ARGS.end))
 
-    LOGGER.debug(all_transactions)
-    return all_transactions
+    transaction_key = str(("transaction", ARGS.start, ARGS.end))
+
+    if transaction_key not in ARGS.cache:
+        ARGS.cache[transaction_key] = list(get_transactions(ARGS.start, ARGS.end))
+
+    LOGGER.debug(ARGS.cache[transaction_key])
+    return ARGS.cache[transaction_key]
 
 
 def init(args: argparse.Namespace):
     global ARGS
     ARGS = args
+    ARGS.cache = shelve.open(ARGS.cache_file_name)
+    if ARGS.use_cache:
+        pass
+    else:
+        ARGS.cache.clear()
     ####################################
     # if all is None, default to most recent 3 months
     if all(x is None for x in (args.start, args.end)):

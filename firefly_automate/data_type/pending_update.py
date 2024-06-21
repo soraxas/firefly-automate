@@ -141,7 +141,8 @@ class PendingUpdates:
         # ret += f"      id: {self.entry.id}\n"
         # ret += f"    rule: {self.rule}\n"
         ret += (
-            f"  > date: " f"{humanize.naturaldate(self.date)}  |  id: {self.entry.id}\n"
+            f"  > date: "
+            f"{humanize.naturaldate(self.date)}  |  id: {self.entry.id}  |  ${float(self.entry.amount):.2f}\n"
         )
         ret += f"    desc: {self.entry.description}\n"
         for k, v in self.updates.items():

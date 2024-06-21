@@ -170,14 +170,19 @@ def get_merge_as_transfer_rule_id():
 
 
 def get_all_account_entries(acc_type: str = None):
-    with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
-        api_instance = accounts_api.AccountsApi(api_client)
-        kwargs = {}
-        if acc_type is not None:
-            kwargs["type"] = acc_type
-        return FireflyPagerWrapper(
-            api_instance.list_account, "accounts", **kwargs
-        ).data_entries()
+    account_key = str(("accounts", acc_type))
+    if account_key not in miscs.args.cache:
+        with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
+            api_instance = accounts_api.AccountsApi(api_client)
+            kwargs = {}
+            if acc_type is not None:
+                kwargs["type"] = acc_type
+            miscs.args.cache[account_key] = list(
+                FireflyPagerWrapper(
+                    api_instance.list_account, "accounts", **kwargs
+                ).data_entries()
+            )
+    return miscs.args.cache[account_key]
 
 
 @functools.lru_cache
@@ -203,7 +208,7 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
         path_params = {"id": str(_id)}
         return api_instance.update_transaction(
             path_params=path_params,
-            body=transaction_update,
+            body=_tran_update,
         )
 
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
