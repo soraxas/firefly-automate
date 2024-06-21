@@ -169,24 +169,31 @@ def get_merge_as_transfer_rule_id():
 #     }
 
 
-def get_all_account_entries():
+def get_all_account_entries(acc_type: str = None):
     with firefly_iii_client.ApiClient(get_firefly_client_conf()) as api_client:
         api_instance = accounts_api.AccountsApi(api_client)
-        return FireflyPagerWrapper(api_instance.list_account, "accounts").data_entries()
+        kwargs = {}
+        if acc_type is not None:
+            kwargs["type"] = acc_type
+        return FireflyPagerWrapper(
+            api_instance.list_account, "accounts", **kwargs
+        ).data_entries()
 
 
 @functools.lru_cache
-def get_firefly_account_mappings() -> Dict[str, str]:
+def get_firefly_account_mappings(acc_type: str = None) -> Dict[str, str]:
     """Only retrieve once, and then cache it"""
     acc_id_to_name = {
-        acc["id"]: acc["attributes"]["name"] for acc in get_all_account_entries()
+        acc["id"]: acc["attributes"]["name"]
+        for acc in get_all_account_entries(acc_type)
     }
     return acc_id_to_name
 
 
-def get_firefly_account_grouped_by_type():
+def get_firefly_account_grouped_by_type(acc_type: str = None):
+    # sort by id
     return miscs.group_by(
-        get_all_account_entries(),
+        sorted(get_all_account_entries(acc_type), key=lambda x: int(x["id"])),
         functor=lambda x: x["attributes"]["type"],
     )
 
@@ -204,7 +211,10 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
         try:
             api_response = _raw_send(transaction_id, transaction_update)
         except firefly_iii_client.ApiException as e:
-            if "This transaction is already reconciled" in e.body:
+            body = e.body
+            if isinstance(body, bytes):
+                body = body.decode()
+            if "This transaction is already reconciled" in body:
                 if miscs.args.always_override_reconciled or miscs.prompt_response(
                     f"> Transaction {transaction_id} is already reconciled. Override?"
                 ):
@@ -232,6 +242,8 @@ def send_transaction_update(transaction_id: int, transaction_update: Transaction
                             ],
                         ),
                     )
+                else:
+                    return None
             else:
                 raise TransactionUpdateError(
                     f"Attempting to update transaction {transaction_id}: "

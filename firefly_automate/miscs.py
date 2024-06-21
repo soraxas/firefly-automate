@@ -64,7 +64,9 @@ def to_datetime(x, **kwargs):
     """
     Custom to_datetime with default args
     """
-    if "format" not in kwargs and hasattr(args, "date_format"):
+    if "format" not in kwargs and (
+        hasattr(args, "date_format") and args.date_format is not None
+    ):
         kwargs["format"] = args.date_format
 
     # australia normally has day first.
@@ -196,22 +198,56 @@ def print_multiple_options(
         print(printer_formatter(option=option, idx=i))
 
 
+def ask_yesno(msg, default=False):
+    default = bool(default)
+    option_str = "Y/n" if default else "y/N"
+    user_input = input(f"{msg}: [{option_str}] ").lower().strip()
+    if user_input == "":
+        return default
+    return user_input.lower() == "y"
+
+
 def select_option(
     options: List[Any],
     query_prompt: str = "",
     print_option_functor: Callable = print_multiple_options,
     *,
     input_string_callback: Optional[Callable[[Any], bool]] = None,
+    keywords: List[str] = None,
 ):
     """
     Select the one of the option based on given input.
     """
+
+    def _print_query():
+        if print_option_functor:
+            print_option_functor(options)
+        print(query_prompt)
+
+    def _return_result(_choice):
+        _options = list(options)
+        selected = _options.pop(_choice)
+        return selected, _options
+
+    if keywords is not None:
+        # try to auto select
+        matched_options = []
+        for i, opt in enumerate(options):
+            if any(k.lower() in opt.lower() for k in keywords):
+                matched_options.append(i)
+        if len(matched_options) == 1:
+            potential = matched_options[0]
+            # exact match
+            _print_query()
+            choice = input(
+                f" >> We found a potential match; is it ({potential + 1}) {options[potential]}? [Y/n] "
+            )
+            if choice.lower() in ("", "y"):
+                return _return_result(potential)
+
     try:
         while True:
-            if print_option_functor:
-                print_option_functor(options)
-
-            print(query_prompt)
+            _print_query()
             # for i, o in enumerate(options):
             #     print(f" [{i+1}] {o}")
             choice = input(f"Select [1-{len(options)}]: ")
@@ -229,9 +265,7 @@ def select_option(
             if choice < 0 or choice >= len(options):
                 print("[ERROR] Choice is out of range.\n")
                 continue
-            options = list(options)
-            selected = options.pop(choice)
-            return selected, options
+            return _return_result(choice)
         return None, options
     except KeyboardInterrupt:
         print("\n> Aborting...")

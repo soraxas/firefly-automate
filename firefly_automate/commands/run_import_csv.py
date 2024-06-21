@@ -14,7 +14,7 @@ from firefly_automate.firefly_request_manager import (
     get_firefly_account_grouped_by_type,
     send_transaction_store,
 )
-from firefly_automate.miscs import Inequality, select_option, to_datetime
+from firefly_automate.miscs import Inequality, select_option, to_datetime, ask_yesno
 
 
 def transform_col_index_to_name(df: pd.DataFrame, columns: List[str]) -> Iterable[str]:
@@ -161,7 +161,7 @@ def init_subparser(parser):
 
 
 def ask_for_account_name():
-    all_accs = get_firefly_account_grouped_by_type()
+    all_accs = get_firefly_account_grouped_by_type(acc_type="asset")
 
     with pd.option_context(
         "display.max_columns",
@@ -205,11 +205,13 @@ def manual_mapping(df):
     print(df.head())
     print("------------------------------")
     selected, remaining = select_option(
-        df.columns, query_prompt="> which one is description?"
+        df.columns, query_prompt="> which one is description?", keywords=["description"]
     )
     new_df_data["description"] = df[selected]
 
-    selected, remaining = select_option(remaining, query_prompt="> which one is date?")
+    selected, remaining = select_option(
+        remaining, query_prompt="> which one is date?", keywords=["date"]
+    )
     new_df_data["date"] = to_datetime(df[selected])
 
     selected, _ = select_option(
@@ -227,6 +229,7 @@ def manual_mapping(df):
         selected, remaining = select_option(
             remaining,
             query_prompt="> which one is incoming (i.e. +'ve balance / Credit)?",
+            keywords=["credit"],
         )
 
         transaction_type[~df[selected].isna()] = "deposit"
@@ -235,16 +238,16 @@ def manual_mapping(df):
         selected, remaining = select_option(
             remaining,
             query_prompt="> which one is outgoing (i.e. -'ve balance / Debit)?",
+            keywords=["debit"],
         )
         transaction_type[~df[selected].isna()] = "withdrawal"
         amount[~df[selected].isna()] = df[selected].apply(filter_clean_dollar_format)
 
         if (amount.astype(float) < 0).sum() > 0:
-            selected, remaining = select_option(
-                ["Yes", "No"],
-                query_prompt="> There's negative value in amount column. Apply absolute value?",
-            )
-            if selected == "Yes":
+            if ask_yesno(
+                msg="> There's negative value in amount column. Apply absolute value?",
+                default=True,
+            ):
                 amount = amount.astype(float).abs().astype(str)
 
         new_df_data["type"] = transaction_type
@@ -498,12 +501,16 @@ def run(args: argparse.Namespace):
     ):
         print(df.to_markdown(index=False))
 
-    if input("Looks Good?: [y/N] ").lower() != "y":
+    if not ask_yesno("Looks Good?", default=False):
         exit(1)
 
-    if df.amount.isnull().values.any() or df.type.isnull().values.any():
+    is_nan_values = df.amount.isnull() | df.type.isnull()
+    if is_nan_values.any():
         print("[ERROR] There exist nans inside amount columns. (unable to map?)")
-        exit(1)
+        print(df[is_nan_values])
+        if not ask_yesno("Ignore them?", default=True):
+            exit(1)
+        df = df[~is_nan_values]
 
     _zero_amount_transactions = df[df.amount.astype(float) == 0]
     if len(_zero_amount_transactions) > 0:
@@ -512,7 +519,7 @@ def run(args: argparse.Namespace):
             "and are not allowed in firefly-iii."
         )
         print(_zero_amount_transactions)
-        if input("Proceed?: [y/N] ").lower() != "y":
+        if ask_yesno("Proceed?", default=False):
             exit(1)
         for index, row in df.iterrows():
             if float(row.amount) == 0:
@@ -534,6 +541,6 @@ def run(args: argparse.Namespace):
 
     # money patch to force capturing input terminal, instead of potential pipe
     sys.stdin = open("/dev/tty")
-    if input("Looks Good?: [y/N] ").lower() == "y":
+    if ask_yesno("Looks Good?", default=False):
         for new_transaction in tqdm.tqdm(new_transactions):
             send_transaction_store(new_transaction)
