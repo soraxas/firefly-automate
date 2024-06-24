@@ -14,7 +14,7 @@ search_keyword_schema = Schema(
     [
         Schema(
             {
-                "name": str,
+                Optional("name"): str,
                 Optional("num_of_token", default="ignore"): Or(str, int),
                 Optional("target", default="description"): str,
                 Optional("keyword", default=""): str,
@@ -22,8 +22,13 @@ search_keyword_schema = Schema(
                 Optional("conditional"): [
                     Schema(
                         {
+                            Optional("transaction_type"): str,
                             Optional("contain_keywords"): [condition_schema],
                             Optional("not_contain_keywords"): [condition_schema],
+                            Optional("value_range"): {
+                                Optional("min"): Or(int, float),
+                                Optional("max"): Or(int, float),
+                            },
                             "replace": replace_schema,
                         }
                     )
@@ -54,10 +59,29 @@ class RuleSearchKeyword(Rule):
             self.config,
         ):
             if search_keywords_in_text(entry[rule["target"]], rule["keyword"]):
+                if "name" not in rule:
+                    rule["name"] = f"unnamed__[{rule['keyword']}]-[{rule['target']}]"
                 self.set_name_suffix(rule["name"])
                 if "conditional" in rule:
                     # check condition
                     for conditional_rule in rule["conditional"]:
+                        if "transaction_type" in conditional_rule:
+                            if (
+                                not entry["type"]
+                                == conditional_rule["transaction_type"]
+                            ):
+                                continue
+                        if "value_range" in conditional_rule:
+                            if not (
+                                conditional_rule["value_range"].get(
+                                    "min", float("-inf")
+                                )
+                                <= float(entry["amount"])
+                                <= conditional_rule["value_range"].get(
+                                    "max", float("inf")
+                                )
+                            ):
+                                continue
                         if "contain_keywords" in conditional_rule:
                             # some field must contain certain values
                             if not all(

@@ -199,13 +199,14 @@ def ask_for_account_name():
 
 
 def manual_mapping(df):
+    remaining = df.columns
     new_df_data = {}
     print("==============================")
     print(" The following is your data")
     print(df.head())
     print("------------------------------")
     selected, remaining = select_option(
-        df.columns, query_prompt="> which one is description?", keywords=["description"]
+        remaining, query_prompt="> which one is description?", keywords=["description"]
     )
     new_df_data["description"] = df[selected]
 
@@ -214,22 +215,17 @@ def manual_mapping(df):
     )
     new_df_data["date"] = to_datetime(df[selected])
 
-    selected, _ = select_option(
-        ["Yes", "No"], query_prompt="> do you have separated incoming/outgoing columns?"
-    )
+    transaction_type = pd.Series([None] * len(df))
+    amount = pd.Series([None] * len(df))
 
-    # selected = 'Ye'
-    # remaining = df.columns
-
-    if selected == "No":
-        raise NotImplementedError("")
-    else:
-        transaction_type = pd.Series([None] * len(df))
-        amount = pd.Series([None] * len(df))
+    if ask_yesno(
+        msg="> Does it has separate incoming/outgoing columns?",
+        default=None,
+    ):
         selected, remaining = select_option(
             remaining,
             query_prompt="> which one is incoming (i.e. +'ve balance / Credit)?",
-            keywords=["credit"],
+            keywords=["credit", "deposit"],
         )
 
         transaction_type[~df[selected].isna()] = "deposit"
@@ -238,7 +234,7 @@ def manual_mapping(df):
         selected, remaining = select_option(
             remaining,
             query_prompt="> which one is outgoing (i.e. -'ve balance / Debit)?",
-            keywords=["debit"],
+            keywords=["debit", "withdrawal"],
         )
         transaction_type[~df[selected].isna()] = "withdrawal"
         amount[~df[selected].isna()] = df[selected].apply(filter_clean_dollar_format)
@@ -250,8 +246,29 @@ def manual_mapping(df):
             ):
                 amount = amount.astype(float).abs().astype(str)
 
-        new_df_data["type"] = transaction_type
-        new_df_data["amount"] = amount
+    else:
+        selected, remaining = select_option(
+            remaining,
+            query_prompt="> which one is the amount column?",
+            keywords=["amount"],
+        )
+        amount[~df[selected].isna()] = df[selected].apply(filter_clean_dollar_format)
+        amount = amount.astype(float)
+
+        _is_positive = amount > 0
+        if _is_positive.sum() == len(amount):
+            if not ask_yesno(
+                msg="> It seems like the column does not contains both +'ve and -'ve values. Still continue?",
+                default=False,
+            ):
+                exit(1)
+        transaction_type[_is_positive] = "deposit"
+        transaction_type[~_is_positive] = "withdrawal"
+        # now that we have classified the transaction type, we can apply absolute value
+        amount = amount.abs()
+
+    new_df_data["type"] = transaction_type
+    new_df_data["amount"] = amount
 
     return pd.DataFrame(new_df_data)
 
@@ -493,8 +510,8 @@ def run(args: argparse.Namespace):
     if args.destination_name is None:
         args.destination_name = account_name
 
-    df.loc[im_destination(df), "destination_name"] = account_name
     df.loc[im_source(df), "source_name"] = account_name
+    df.loc[im_destination(df), "destination_name"] = account_name
 
     with pd.option_context(
         "display.max_columns", None, "display.max_colwidth", 20, "display.width", 0

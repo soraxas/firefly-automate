@@ -199,12 +199,19 @@ def print_multiple_options(
 
 
 def ask_yesno(msg, default=False):
-    default = bool(default)
-    option_str = "Y/n" if default else "y/N"
-    user_input = input(f"{msg}: [{option_str}] ").lower().strip()
-    if user_input == "":
-        return default
-    return user_input.lower() == "y"
+    option_str = "y/n"
+    if default == True:
+        option_str = "Y/n"
+    elif default == False:
+        option_str = "y/N"
+    while True:
+        user_input = input(f"{msg}: [{option_str}] ").lower().strip().lower()
+        if user_input == "" and default is not None:
+            return bool(default)
+        if user_input == "y":
+            return True
+        elif user_input == "n":
+            return False
 
 
 def select_option(
