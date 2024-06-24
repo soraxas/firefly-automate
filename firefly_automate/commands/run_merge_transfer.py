@@ -4,12 +4,36 @@ import atexit
 import logging
 from dataclasses import dataclass
 from multiprocessing import Lock
-from typing import List
+from typing import List, Set, Tuple
 
 import numpy as np
 import pandas as pd
 import pytz
 import tqdm
+
+from firefly_automate.config_loader import config
+from firefly_automate.data_type.pending_update import (
+    PendingUpdates,
+)
+
+
+@dataclass
+class MergingRequest:
+    info_df: pd.DataFrame
+    destination_acc_name: str
+    withdrawl_to_transfer_update: PendingUpdates
+    deposit_transaction_to_delete: str
+
+    def get_ids(self):
+        return tuple(sorted(int(_id) for _id in self.info_df.id.values))
+
+
+conf = config["merge_transfer"]
+
+IGNORED_IDS: Set[Tuple[int]] = {tuple(sorted(pair)) for pair in conf["ignore_id_pairs"]}
+
+PENDING_IGNORED_MERGE_REQUEST: List[MergingRequest] = []
+
 
 from firefly_automate.connections_helpers import AsyncRequest, ignore_keyboard_interrupt
 from firefly_automate.data_type.pending_update import PendingUpdates
@@ -45,14 +69,6 @@ def merge_atomic_operation(_transfer_update, dest_acc_name: str):
         )
         # now let's add this new tag to the withdrawal
         _transfer_update.apply(dry_run=False)
-
-
-@dataclass
-class MergingRequest:
-    info_df: pd.DataFrame
-    destination_acc_name: str
-    withdrawl_to_transfer_update: PendingUpdates
-    deposit_transaction_to_delete: str
 
 
 command_name = "merge"
@@ -115,16 +131,18 @@ def process_in_batch(pending_updates: List[MergingRequest], _async_process_Q: Li
             print_df(pending_update.info_df)
             print(f"=" * (20 * 2 + 3))
 
-    while True:
+    while len(pending_updates) > 0:
         print_pending_updates(pending_updates)
         print(
             ">> IMPORTANT: Review the above output and see if the updates are ok. Or enter space-separated number to ignore:"
         )
         inputs = input(f">> [1-{len(pending_updates)}/y/N] ")
-        inputs = inputs.strip()
-        if inputs in ("n", "N", ""):
+        inputs = inputs.strip().lower()
+        if inputs in ("n", ""):
+            for u in pending_updates:
+                PENDING_IGNORED_MERGE_REQUEST.append(u)
             break
-        if inputs.lower() == "y":
+        if inputs == "y":
             # send to run in background.
             def runner(_updates):
                 # for updates in tqdm.tqdm(pending_updates, desc="Applying updates"):
@@ -153,16 +171,13 @@ def process_in_batch(pending_updates: List[MergingRequest], _async_process_Q: Li
                 print("Invalid choices")
                 continue
             nums = list(reversed(sorted(set(nums))))
-            print(nums)
             if not all(0 <= n < len(pending_updates) for n in nums):
                 print("Number out of range.")
                 continue
             # remove them from pendings
             for i in nums:
-                pending_updates.pop(i)
-            if len(pending_updates) == 0:
-                break
-            print_pending_updates(pending_updates)
+                ignored = pending_updates.pop(i)
+                PENDING_IGNORED_MERGE_REQUEST.append(ignored)
     return True
 
     # pending_deletes.clear()
@@ -283,22 +298,25 @@ def run(args: argparse.ArgumentParser):
 
                 canidate_transfer_to = potential_match_by_date.iloc[0]
 
-                process_batch.append(
-                    MergingRequest(
-                        info_df=info_df,
-                        destination_acc_name=canidate_transfer_to.dest,
-                        withdrawl_to_transfer_update=PendingUpdates(
-                            IDS_to_transaction[canidate_transfer_from.id],
-                            "merging",
-                            apply_rule=True,
-                            updates_kwargs=dict(
-                                description=f"[{canidate_transfer_from.desc}] > [{canidate_transfer_to.desc}]",
-                                tags=["AUTOMATE_convert-as-transfer"],
-                            ),
+                merge_request = MergingRequest(
+                    info_df=info_df,
+                    destination_acc_name=canidate_transfer_to.dest,
+                    withdrawl_to_transfer_update=PendingUpdates(
+                        IDS_to_transaction[canidate_transfer_from.id],
+                        "merging",
+                        apply_rule=True,
+                        updates_kwargs=dict(
+                            description=f"[{canidate_transfer_from.desc}] > [{canidate_transfer_to.desc}]",
+                            tags=["AUTOMATE_convert-as-transfer"],
                         ),
-                        deposit_transaction_to_delete=canidate_transfer_to.id,
-                    )
+                    ),
+                    deposit_transaction_to_delete=canidate_transfer_to.id,
                 )
+
+                if merge_request.get_ids() in IGNORED_IDS:
+                    continue
+
+                process_batch.append(merge_request)
                 PENDING_DELETE_ID.add(canidate_transfer_to.id)
 
                 if len(process_batch) >= args.batch_size:
@@ -307,3 +325,12 @@ def run(args: argparse.ArgumentParser):
 
     process_in_batch(process_batch, async_process_Q)
     process_batch.clear()
+
+    if len(PENDING_IGNORED_MERGE_REQUEST) > 0:
+        print("=" * 20)
+        print("> The following ids are ignored:")
+        for req in PENDING_IGNORED_MERGE_REQUEST:
+            desc = req.info_df.iloc[0].desc[:20]
+            trans1 = f"{req.info_df.iloc[0].source} => {req.info_df.iloc[0].dest}"
+            trans2 = f"{req.info_df.iloc[1].source} => {req.info_df.iloc[1].dest}"
+            print(f"    - {list(req.get_ids())}  # {desc} [{trans1}] ~ [{trans2}]")

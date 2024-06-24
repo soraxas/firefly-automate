@@ -67,9 +67,25 @@ class Rule:
         new_attrs: Dict[str, TransactionUpdateValueType],
     ):
         """Add a new updates to wrt to the entry"""
+        new_attrs = dict(new_attrs)  # later on the code update this dict.
         # auto wrap a single tag with a list
         if "tags" in new_attrs and type(new_attrs["tags"]) is str:
             new_attrs["tags"] = [new_attrs["tags"]]
+
+        # process special_rule
+        if "__CURRENT_source_destination_name" in new_attrs:
+            assert entry.type in ("withdrawal", "deposit")
+
+            new_key = (
+                "source_name" if entry.type == "withdrawal" else "destination_name"
+            )
+            new_attrs[new_key] = new_attrs.pop("__CURRENT_source_destination_name")
+
+        if "__OPPOSITE_source_destination_name" in new_attrs:
+            assert entry.type in ("withdrawal", "deposit")
+
+            new_key = "source_name" if entry.type == "deposit" else "destination_name"
+            new_attrs[new_key] = new_attrs.pop("__OPPOSITE_source_destination_name")
 
         try:
             if entry.id not in self.pending_updates:

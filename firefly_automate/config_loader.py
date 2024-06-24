@@ -57,6 +57,7 @@ main_config_schema = Schema(
         # the mapping should be a string map to a string
         Optional("vendor_name_mappings"): Schema({str: str}),
         Optional("ignore_transaction_ids"): Schema([int]),
+        Optional("merge_transfer"): Schema({Optional("ignore_id_pairs"): [[int]]}),
     }
 )
 
