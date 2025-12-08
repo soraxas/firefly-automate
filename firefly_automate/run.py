@@ -1,7 +1,6 @@
 #!/bin/env python
 import argparse
 import logging
-import os
 import shelve
 from datetime import datetime
 
@@ -13,7 +12,8 @@ from firefly_automate.firefly_request_manager import get_transactions
 from firefly_automate.miscs import setup_logger
 
 from . import miscs
-from .commands import run_import_csv, run_merge_transfer, run_transform_transactions
+from .commands import (run_import_csv, run_merge_transfer,
+                       run_transform_transactions)
 
 LOGGER = logging.getLogger()
 

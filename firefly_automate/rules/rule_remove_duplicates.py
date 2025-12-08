@@ -3,7 +3,8 @@ import dataclasses
 from schema import Schema
 
 from firefly_automate import miscs
-from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import \
+    FireflyTransactionDataClass
 from firefly_automate.rules.base_rule import Rule
 
 remove_duplicates_schema = Schema(

@@ -1,20 +1,19 @@
 #!/bin/env python
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterable, List, Tuple
 
-import re
 import pandas as pd
 import tqdm
 import yaml
 
 from firefly_automate.firefly_request_manager import (
-    create_transaction_store,
-    get_firefly_account_grouped_by_type,
-    send_transaction_store,
-)
-from firefly_automate.miscs import Inequality, select_option, to_datetime, ask_yesno
+    create_transaction_store, get_firefly_account_grouped_by_type,
+    send_transaction_store)
+from firefly_automate.miscs import (Inequality, ask_yesno, select_option,
+                                    to_datetime)
 
 
 def transform_col_index_to_name(df: pd.DataFrame, columns: List[str]) -> Iterable[str]:

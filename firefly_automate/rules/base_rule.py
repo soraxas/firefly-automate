@@ -7,10 +7,9 @@ from schema import Schema
 
 from firefly_automate.config_loader import config
 from firefly_automate.data_type.pending_update import (
-    PendingUpdates,
-    TransactionUpdateValueType,
-)
-from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
+    PendingUpdates, TransactionUpdateValueType)
+from firefly_automate.data_type.transaction_type import \
+    FireflyTransactionDataClass
 from firefly_automate.miscs import FireflyIIIRulesConflictException
 
 
