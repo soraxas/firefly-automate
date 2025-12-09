@@ -2,28 +2,20 @@ import argparse
 import logging
 import pprint
 import re
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    List,
-    Match,
-    Optional,
-    TypeVar,
-    Union,
-)
+from datetime import datetime
+from typing import (TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Match,
+                    Optional, TypeVar, Union)
 
 import pandas as pd
-
-from datetime import datetime
 from dateutil.parser import parse as dateutil_parser
+
 from firefly_automate import firefly_request_manager
 
 if TYPE_CHECKING:
-    from firefly_automate.data_type.pending_update import TransactionOwnerReturnType
-    from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
+    from firefly_automate.data_type.pending_update import \
+        TransactionOwnerReturnType
+    from firefly_automate.data_type.transaction_type import \
+        FireflyTransactionDataClass
 
 
 def get_transaction_owner(

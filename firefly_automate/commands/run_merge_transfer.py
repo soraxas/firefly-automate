@@ -12,9 +12,7 @@ import pytz
 import tqdm
 
 from firefly_automate.config_loader import config
-from firefly_automate.data_type.pending_update import (
-    PendingUpdates,
-)
+from firefly_automate.data_type.pending_update import PendingUpdates
 
 
 @dataclass
@@ -35,13 +33,11 @@ IGNORED_IDS: Set[Tuple[int]] = {tuple(sorted(pair)) for pair in conf["ignore_id_
 PENDING_IGNORED_MERGE_REQUEST: List[MergingRequest] = []
 
 
-from firefly_automate.connections_helpers import AsyncRequest, ignore_keyboard_interrupt
+from firefly_automate.connections_helpers import (AsyncRequest,
+                                                  ignore_keyboard_interrupt)
 from firefly_automate.data_type.pending_update import PendingUpdates
 from firefly_automate.firefly_request_manager import (
-    get_merge_as_transfer_rule_id,
-    send_transaction_delete,
-    update_rule_action,
-)
+    get_merge_as_transfer_rule_id, send_transaction_delete, update_rule_action)
 from firefly_automate.miscs import to_datetime
 
 LOGGER = logging.getLogger()

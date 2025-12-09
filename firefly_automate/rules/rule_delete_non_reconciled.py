@@ -1,6 +1,7 @@
 from schema import Schema
 
-from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import \
+    FireflyTransactionDataClass
 from firefly_automate.rules.base_rule import Rule
 
 remove_duplicates_schema = Schema({})

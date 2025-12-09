@@ -1,7 +1,9 @@
-from schema import Optional, Or, Schema
 from dataclasses import dataclass
 
-from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
+from schema import Optional, Or, Schema
+
+from firefly_automate.data_type.transaction_type import \
+    FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text
 from firefly_automate.rules.base_rule import Rule
 
