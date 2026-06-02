@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "firefly-automate"
+version = "1.0.0"
+description = "Automate Firefly management."
+readme = "README.md"
+requires-python = ">=3.9,<3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "Tin Lai (@soraxas)", email = "oscar@tinyiu.com" }
+]
+keywords = ["tui"]
+
+dependencies = [
+  "Firefly-III-API-Client==2.0.5.0",
+  "pandas>=1.3.1",
+  "pyyaml>=5.4.1",
+  "schema>=0.7.4",
+  "tqdm~=4.62.0",
+  "python-dateutil>=2.7.0",
+  "humanize>=3.11.0",
+  "argcomplete>=1.12.3",
+  "tabulate",
+]
+
+classifiers = [
+  "Environment :: Console",
+  "Framework :: Matplotlib",
+  "Intended Audience :: Developers",
+  "Intended Audience :: End Users/Desktop",
+  "Intended Audience :: System Administrators",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX",
+  "Operating System :: Unix",
+  "Programming Language :: Python :: 3.6",
+  "Programming Language :: Python :: 3.7",
+  "Programming Language :: Python :: 3.8",
+  "Programming Language :: Python :: 3.9",
+  "Topic :: Desktop Environment",
+  "Topic :: Terminals",
+  "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/soraxas/firefly-automate"
+
+[project.scripts]
+firefly-automate = "firefly_automate.run:main"
+firefly-import-csv = "firefly_automate.run_import_csv:main"
+
+[tool.setuptools]
+packages = [
+  "firefly_automate",
+  "firefly_automate.rules",
+]
+
+[tool.uv]
+# Firefly-III-API-Client==2.0.5.0 hard-pins python-dateutil ~=2.7.0, which would
+# cap pandas at 1.3.x (no arm64/py3.9 wheel -> sdist build failure). The client
+# runs fine on a newer dateutil, so override the pin to free the modern stack.
+override-dependencies = ["python-dateutil>=2.8.2"]
