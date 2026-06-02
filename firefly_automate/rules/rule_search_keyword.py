@@ -3,8 +3,7 @@ from typing import Dict, Union
 
 from schema import Optional, Or, Schema
 
-from firefly_automate.data_type.transaction_type import \
-    FireflyTransactionDataClass
+from firefly_automate.data_type.transaction_type import FireflyTransactionDataClass
 from firefly_automate.miscs import search_keywords_in_text
 from firefly_automate.rules.base_rule import Rule, StopRuleProcessing
 
@@ -12,14 +11,12 @@ replace_schema = Schema({str: Or(str, [str])})
 
 
 class Conditional(ABC):
-
     @abstractmethod
     def parse(self):
         pass
 
 
 class TransactionTypeCond(Conditional):
-
     def parse(self):
         pass
 
@@ -101,6 +98,23 @@ _and_children.append(UnitConditionalSchema)
 _or_children.append(UnitConditionalSchema)
 
 
+# A sub-rule nested under `if_true_then`. It has the same shape as a top-level
+# rule, except its `conditional` is optional (an absent conditional always
+# matches once the parent rule has matched). Defined recursively so sub-rules
+# may themselves nest further `if_true_then` branches.
+_if_true_then_children = []
+sub_rule_schema = Schema(
+    {
+        Optional("name"): str,
+        Optional("stop", default=False): bool,
+        Optional("conditional"): UnitConditionalSchema,
+        Optional("replace"): replace_schema,
+        Optional("if_true_then"): _if_true_then_children,
+    }
+)
+_if_true_then_children.append(sub_rule_schema)
+
+
 search_keyword_schema = Schema(
     [
         Schema(
@@ -112,6 +126,8 @@ search_keyword_schema = Schema(
                 Optional("stop", default=False): bool,
                 "conditional": UnitConditionalSchema,
                 Optional("replace"): replace_schema,
+                # only applied when this rule's `conditional` matched
+                Optional("if_true_then"): _if_true_then_children,
             }
         )
     ]
@@ -137,14 +153,20 @@ class RuleSearchKeyword(Rule):
             #     lambda x: x["num_of_token"] == num_of_token,
             #     self.config,
             # ):
-            if "name" not in rule:
-                rule["name"] = f"unnamed__[{rule['conditional']}]"
-            self.set_name_suffix(rule["name"])
-            if "conditional" in rule and not unit_conditional_parser(
-                entry, rule["conditional"]
-            ):
-                continue
-            if "replace" in rule:
-                self.add_updates(entry, rule["replace"])
-            if rule["stop"]:
-                raise StopRuleProcessing()
+            self._process_rule(entry, rule)
+
+    def _process_rule(self, entry: FireflyTransactionDataClass, rule: Dict):
+        if "name" not in rule:
+            rule["name"] = f"unnamed__[{rule.get('conditional', rule.get('replace'))}]"
+        self.set_name_suffix(rule["name"])
+        if "conditional" in rule and not unit_conditional_parser(
+            entry, rule["conditional"]
+        ):
+            return
+        if "replace" in rule:
+            self.add_updates(entry, rule["replace"])
+        # the conditional matched: descend into any nested sub-rules
+        for sub_rule in rule.get("if_true_then", []):
+            self._process_rule(entry, sub_rule)
+        if rule.get("stop", False):
+            raise StopRuleProcessing()
